@@ -41,6 +41,7 @@ private data class Track(
 class MainActivity : Activity() {
     private val tracks = mutableListOf<Track>()
     private val favorites = mutableSetOf<String>()
+    private val hiddenFolders = mutableSetOf<String>()
     private val playlistMap = linkedMapOf<String, MutableSet<String>>()
     private val ratings = mutableMapOf<String, Int>()
     private val bookmarks = mutableMapOf<String, Long>()
@@ -49,6 +50,8 @@ class MainActivity : Activity() {
     private val customAlbums = mutableMapOf<String, String>()
     private var section = "Songs"
     private var query = ""
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var uiTicker: Runnable? = null
     private var sortMode = "Title"
     private var dark = true
     private var controller: MediaController? = null
@@ -71,7 +74,8 @@ class MainActivity : Activity() {
     private lateinit var playButton: Button
     private lateinit var seek: SeekBar
     private lateinit var timeText: TextView
-    private val orange = Color.rgb(255, 138, 61)
+    private var accentColor = Color.rgb(255, 138, 61)
+    private val orange get() = accentColor
     private val bg get() = if (dark) Color.rgb(15, 16, 20) else Color.rgb(247, 247, 250)
     private val panel get() = if (dark) Color.rgb(30, 32, 39) else Color.rgb(231, 232, 238)
     private val fg get() = if (dark) Color.rgb(245, 245, 248) else Color.rgb(24, 25, 30)
@@ -91,6 +95,8 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
         dark = prefs.getBoolean("dark", true)
+        accentColor = prefs.getInt("accent", Color.rgb(255, 138, 61))
+        hiddenFolders.addAll(prefs.getStringSet("hidden_folders", emptySet()) ?: emptySet())
         sortMode = prefs.getString("sort", "Title") ?: "Title"
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
         readStringMap(prefs.getString("custom_artists", "{}"), customArtists)
@@ -122,6 +128,8 @@ class MainActivity : Activity() {
             .putStringSet("favorites", favorites.toSet())
             .putString("playlists", json.toString())
             .putBoolean("dark", dark)
+            .putInt("accent", accentColor)
+            .putStringSet("hidden_folders", hiddenFolders.toSet())
             .putString("sort", sortMode)
             .putString("custom_titles", JSONObject(customTitles as Map<*, *>).toString())
             .putString("custom_artists", JSONObject(customArtists as Map<*, *>).toString())
@@ -256,12 +264,14 @@ class MainActivity : Activity() {
         playerPanel.addView(tools)
         root.addView(playerPanel)
         setContentView(root)
-        Handler(Looper.getMainLooper()).post(object : Runnable {
+        uiTicker?.let { uiHandler.removeCallbacks(it) }
+        uiTicker = object : Runnable {
             override fun run() {
                 updatePlaybackUi()
-                Handler(Looper.getMainLooper()).postDelayed(this, 700)
+                uiHandler.postDelayed(this, 700L)
             }
-        })
+        }
+        uiHandler.post(uiTicker!!)
     }
 
     private fun actionButton(label: String, action: () -> Unit): Button = Button(this).apply {
@@ -332,7 +342,7 @@ class MainActivity : Activity() {
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
             val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
-            matches && when (section) {
+            !hiddenFolders.contains(t.path) && matches && when (section) {
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
@@ -638,7 +648,7 @@ class MainActivity : Activity() {
     }
 
     private fun showMoreMenu() {
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue")
         AlertDialog.Builder(this).setTitle("LaCzek tools").setItems(options) { _, which ->
             when (which) {
                 0 -> scanLibrary()
@@ -652,9 +662,57 @@ class MainActivity : Activity() {
                 8 -> importBackup()
                 9 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().remove("last_track").remove("recent_order").apply(); Toast.makeText(this, "Playback history cleared", Toast.LENGTH_SHORT).show() }
                 10 -> showPlaylistOverview()
+                11 -> chooseAccentColour()
+                12 -> manageHiddenFolders()
+                13 -> saveQueueForLater()
+                14 -> restoreSavedQueue()
             }
         }.show()
     }
+    private fun chooseAccentColour() {
+        val names = arrayOf("LaCzek orange", "Cyan", "Purple", "Green", "Pink", "Blue", "White")
+        val colours = intArrayOf(Color.rgb(255, 138, 61), Color.rgb(0, 210, 220), Color.rgb(174, 106, 255), Color.rgb(68, 205, 120), Color.rgb(255, 90, 160), Color.rgb(75, 145, 255), Color.WHITE)
+        val selected = colours.indexOf(accentColor).coerceAtLeast(0)
+        AlertDialog.Builder(this).setTitle("Accent colour").setSingleChoiceItems(names, selected) { dialog, which ->
+            accentColor = colours[which]; saveLocalSettings(); rebuildUi(); dialog.dismiss()
+        }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun manageHiddenFolders() {
+        val folders = tracks.map { it.path }.distinct().sorted().toTypedArray()
+        if (folders.isEmpty()) { Toast.makeText(this, "Scan music first", Toast.LENGTH_SHORT).show(); return }
+        val checked = BooleanArray(folders.size) { hiddenFolders.contains(folders[it]) }
+        AlertDialog.Builder(this).setTitle("Hide folders from the library")
+            .setMultiChoiceItems(folders, checked) { _, which, isChecked -> if (isChecked) hiddenFolders.add(folders[which]) else hiddenFolders.remove(folders[which]) }
+            .setPositiveButton("Save") { _, _ -> saveLocalSettings(); renderLibrary() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun saveQueueForLater() {
+        val p = controller
+        if (p == null || p.mediaItemCount == 0) { Toast.makeText(this, "Queue is empty", Toast.LENGTH_SHORT).show(); return }
+        val arr = JSONArray()
+        for (i in 0 until p.mediaItemCount) arr.put(p.getMediaItemAt(i).mediaId)
+        getSharedPreferences("laczek_player", MODE_PRIVATE).edit().putString("saved_queue", arr.toString())
+            .putInt("saved_queue_index", p.currentMediaItemIndex).putLong("saved_queue_position", p.currentPosition).apply()
+        Toast.makeText(this, "Queue saved locally", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun restoreSavedQueue() {
+        try {
+            val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+            val arr = JSONArray(prefs.getString("saved_queue", "[]"))
+            val saved = (0 until arr.length()).map { arr.optString(it) }
+            val items = saved.mapNotNull { id -> tracks.firstOrNull { it.id.toString() == id } }
+            if (items.isEmpty()) { Toast.makeText(this, "No saved local queue found", Toast.LENGTH_SHORT).show(); return }
+            val start = prefs.getInt("saved_queue_index", 0).coerceIn(0, items.lastIndex)
+            val position = prefs.getLong("saved_queue_position", 0L).coerceAtLeast(0L)
+            controller?.setMediaItems(items.map { mediaItem(it) }, start, position)
+            controller?.prepare(); controller?.play()
+            Toast.makeText(this, "Saved queue restored", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) { Toast.makeText(this, "Could not restore the saved queue", Toast.LENGTH_SHORT).show() }
+    }
+
     private fun chooseSort() {
         val modes = arrayOf("Title", "Artist", "Album", "Duration", "Newest")
         AlertDialog.Builder(this).setTitle("Sort library").setSingleChoiceItems(modes, modes.indexOf(sortMode).coerceAtLeast(0)) { d, which ->
@@ -1006,6 +1064,7 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     override fun onDestroy() {
+        uiTicker?.let { uiHandler.removeCallbacks(it) }
         equalizer?.release()
         bassBoost?.release()
         virtualizer?.release()
