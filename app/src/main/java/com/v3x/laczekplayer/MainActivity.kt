@@ -132,7 +132,7 @@ class MainActivity : Activity() {
         search = EditText(this).apply {
             hint = "Search songs, artists, albums…"
             textSize = 14f
-            singleLine = true
+            isSingleLine = true
             setTextColor(fg)
             setHintTextColor(muted)
             setPadding(dp(14), 0, dp(14), 0)
@@ -463,7 +463,7 @@ class MainActivity : Activity() {
         val current = controller?.playbackParameters?.speed ?: 1f
         val selected = speeds.indices.minByOrNull { kotlin.math.abs(speeds[it] - current) } ?: 2
         AlertDialog.Builder(this).setTitle("Playback speed").setSingleChoiceItems(labels, selected) { dialog, which ->
-            controller?.setPlaybackSpeed(speeds[which], 1f)
+            controller?.setPlaybackSpeed(speeds[which])
             dialog.dismiss()
         }.setNegativeButton("Cancel", null).show()
     }
