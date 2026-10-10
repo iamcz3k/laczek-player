@@ -761,6 +761,11 @@ class MainActivity : Activity() {
                             .put("dark", dark)
                             .put("sort", sortMode)
                             .put("playlists", JSONArray(prefs.getString("playlists", "[]")))
+                            .put("custom_titles", JSONObject(customTitles as Map<*, *>))
+                            .put("custom_artists", JSONObject(customArtists as Map<*, *>))
+                            .put("custom_albums", JSONObject(customAlbums as Map<*, *>))
+                            .put("bookmarks", JSONObject(bookmarks as Map<*, *>))
+                            .put("ratings", JSONObject(ratings as Map<*, *>))
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(backup.toString(2)) }
                         Toast.makeText(this, "Local backup exported", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) { Toast.makeText(this, "Backup export failed", Toast.LENGTH_SHORT).show() }
@@ -776,6 +781,11 @@ class MainActivity : Activity() {
                         for (i in 0 until favs.length()) favorites.add(favs.optString(i))
                         dark = backup.optBoolean("dark", true)
                         sortMode = backup.optString("sort", "Title")
+                        customTitles.clear(); readStringMap(backup.optString("custom_titles", "{}"), customTitles)
+                        customArtists.clear(); readStringMap(backup.optString("custom_artists", "{}"), customArtists)
+                        customAlbums.clear(); readStringMap(backup.optString("custom_albums", "{}"), customAlbums)
+                        bookmarks.clear(); readLongMap(backup.optString("bookmarks", "{}"), bookmarks)
+                        ratings.clear(); readIntMap(backup.optString("ratings", "{}"), ratings)
                         playlistMap.clear()
                         val lists = backup.optJSONArray("playlists") ?: JSONArray()
                         for (i in 0 until lists.length()) {
