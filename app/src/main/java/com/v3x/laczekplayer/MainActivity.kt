@@ -658,15 +658,17 @@ class MainActivity : Activity() {
         }.show()
     }
     private fun setSleepTimer() {
-        val options = arrayOf("5 minutes", "10 minutes", "15 minutes", "30 minutes", "45 minutes", "60 minutes", "Stop after current song", "Cancel timer")
+        val options = arrayOf("5 minutes", "10 minutes", "15 minutes", "30 minutes", "45 minutes", "60 minutes", "Stop after current song", "Fade out over 10 seconds", "Cancel timer")
         AlertDialog.Builder(this).setTitle("Offline sleep timer").setItems(options) { _, which ->
             sleepRunnable?.let { sleepHandler?.removeCallbacks(it) }
-            if (which == 7) { Toast.makeText(this, "Sleep timer cancelled", Toast.LENGTH_SHORT).show(); return@setItems }
+            if (which == 8) { Toast.makeText(this, "Sleep timer cancelled", Toast.LENGTH_SHORT).show(); return@setItems }
             if (which == 6) {
                 controller?.addListener(object : Player.Listener {
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { controller?.pause(); controller?.removeListener(this) }
                 })
                 Toast.makeText(this, "Will stop after this track", Toast.LENGTH_SHORT).show()
+            } else if (which == 7) {
+                fadeOutAndPause()
             } else {
                 val mins = intArrayOf(5,10,15,30,45,60)[which]
                 sleepHandler = Handler(Looper.getMainLooper())
@@ -675,6 +677,21 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "Playback stops in $mins minutes", Toast.LENGTH_SHORT).show()
             }
         }.show()
+    }
+
+    private fun fadeOutAndPause() {
+        val p = controller ?: return
+        sleepHandler = Handler(Looper.getMainLooper())
+        var step = 0
+        sleepRunnable = object : Runnable {
+            override fun run() {
+                step += 1
+                p.volume = (1f - step / 20f).coerceAtLeast(0f)
+                if (step >= 20) { p.pause(); p.volume = 1f; sleepRunnable = null; Toast.makeText(this@MainActivity, "Faded out and paused", Toast.LENGTH_SHORT).show() }
+                else sleepHandler?.postDelayed(this, 500L)
+            }
+        }
+        sleepRunnable?.run()
     }
 
     private fun chooseLyrics() {
