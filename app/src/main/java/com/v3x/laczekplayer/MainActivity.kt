@@ -143,7 +143,7 @@ class MainActivity : Activity() {
         root.addView(search, LinearLayout.LayoutParams(-1, dp(48)))
         val navScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, dp(8)) }
-        listOf("Songs", "Albums", "Artists", "Folders", "Favorites", "Playlists").forEach { name ->
+        listOf("Songs", "Albums", "Artists", "Folders", "Recent", "Most played", "Favorites", "Playlists").forEach { name ->
             nav.addView(actionButton(name) { section = name; renderLibrary() }.apply {
                 textSize = 12f
                 setPadding(dp(10), 0, dp(10), 0)
@@ -195,7 +195,9 @@ class MainActivity : Activity() {
         val tools = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
         tools.addView(actionButton("Shuffle") { toggleShuffle() })
         tools.addView(actionButton("Repeat") { cycleRepeat() })
-        tools.addView(actionButton("Lyrics") { chooseLyrics() })
+        tools.addView(actionButton("Lyrics") { showLyrics() })
+        tools.addView(actionButton("Speed") { setPlaybackSpeed() })
+        tools.addView(actionButton("Queue") { showQueue() })
         tools.addView(actionButton("EQ") { showEqualizer() })
         playerPanel.addView(tools)
         root.addView(playerPanel)
@@ -268,9 +270,19 @@ class MainActivity : Activity() {
             val matches = query.isBlank() || listOf(t.title, t.artist, t.album, t.path).any { it.contains(query, true) }
             matches && when (section) {
                 "Favorites" -> favorites.contains(t.id.toString())
+                "Recent" -> recentTrackIds().contains(t.id.toString())
+                "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
                 "Albums", "Artists", "Folders", "Playlists" -> true
                 else -> true
             }
+        }
+        if (section == "Recent") {
+            val order = recentTrackIds()
+            return result.sortedBy { order.indexOf(it.id.toString()).let { pos -> if (pos < 0) Int.MAX_VALUE else pos } }
+        }
+        if (section == "Most played") {
+            val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+            return result.sortedByDescending { prefs.getInt("plays_" + it.id, 0) }
         }
         if (section == "Playlists" && playlistMap.isNotEmpty()) {
             val names = playlistMap.keys.toList()
@@ -390,7 +402,13 @@ class MainActivity : Activity() {
         p.setMediaItems(list.map { mediaItem(it) }, 0, 0L)
         p.prepare()
         p.play()
-        getSharedPreferences("laczek_player", MODE_PRIVATE).edit().putLong("last_track", track.id).apply()
+        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        val recent = recentTrackIds().toMutableList()
+        recent.remove(track.id.toString())
+        recent.add(0, track.id.toString())
+        prefs.edit().putLong("last_track", track.id)
+            .putInt("plays_" + track.id, prefs.getInt("plays_" + track.id, 0) + 1)
+            .putString("recent_order", JSONArray(recent.take(200)).toString()).apply()
         updatePlaybackUi()
     }
     private fun playTracks(items: List<Track>) {
@@ -430,6 +448,38 @@ class MainActivity : Activity() {
         val position = p?.currentPosition?.coerceAtLeast(0) ?: 0L
         seek.progress = if (duration > 0) (position * 1000 / duration).toInt() else 0
         timeText.text = "${formatTime(position)} / ${formatTime(duration)}"
+    }
+
+    private fun recentTrackIds(): List<String> {
+        return try {
+            val arr = JSONArray(getSharedPreferences("laczek_player", MODE_PRIVATE).getString("recent_order", "[]"))
+            (0 until arr.length()).map { arr.optString(it) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun setPlaybackSpeed() {
+        val speeds = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+        val labels = speeds.map { it.toString() + "×" }.toTypedArray()
+        val current = controller?.playbackParameters?.speed ?: 1f
+        val selected = speeds.indices.minByOrNull { kotlin.math.abs(speeds[it] - current) } ?: 2
+        AlertDialog.Builder(this).setTitle("Playback speed").setSingleChoiceItems(labels, selected) { dialog, which ->
+            controller?.setPlaybackSpeed(speeds[which], 1f)
+            dialog.dismiss()
+        }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showQueue() {
+        val p = controller
+        if (p == null || p.mediaItemCount == 0) {
+            AlertDialog.Builder(this).setTitle("Playback queue").setMessage("The queue is empty. Play a song first.").setPositiveButton("Close", null).show()
+            return
+        }
+        val labels = (0 until p.mediaItemCount).map { i ->
+            val item = p.getMediaItemAt(i)
+            (if (i == p.currentMediaItemIndex) "▶ " else "") + (item.mediaMetadata.title ?: item.mediaId)
+        }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Queue · " + p.mediaItemCount + " tracks").setItems(labels) { _, which -> p.seekToDefaultPosition(which); p.play() }
+            .setNeutralButton("Clear queue") { _, _ -> p.clearMediaItems() }.show()
     }
 
     private fun createPlaylist() {
