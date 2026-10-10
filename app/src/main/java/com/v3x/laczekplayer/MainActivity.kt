@@ -659,7 +659,7 @@ class MainActivity : Activity() {
     private data class TimedLyric(val timeMs: Long, val text: String)
 
     private fun parseLyrics(): List<TimedLyric> {
-        val pattern = Regex("""\\[([0-9]{1,2}):([0-9]{2})(?:[.:]([0-9]{1,3}))?]""")
+        val pattern = Regex("""\[([0-9]{1,2}):([0-9]{2})(?:[.:]([0-9]{1,3}))?]""")
         val parsed = mutableListOf<TimedLyric>()
         lyricText.lineSequence().forEach { line ->
             val matches = pattern.findAll(line).toList()
