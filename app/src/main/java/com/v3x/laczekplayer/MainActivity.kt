@@ -204,7 +204,7 @@ class MainActivity : Activity() {
         root.addView(search, LinearLayout.LayoutParams(-1, dp(48)))
         val navScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, dp(8)) }
-        listOf("Songs", "Albums", "Artists", "Folders", "Recent", "Most played", "Duplicates", "Favorites", "Playlists").forEach { name ->
+        listOf("Songs", "Albums", "Artists", "Folders", "Composers", "Years", "Formats", "Recent", "Most played", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
             nav.addView(actionButton(name) { section = name; currentPlaylist = null; renderLibrary() }.apply {
                 textSize = 12f
                 setPadding(dp(10), 0, dp(10), 0)
@@ -346,11 +346,12 @@ class MainActivity : Activity() {
         var result = tracks.filter { t ->
             val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
             !hiddenFolders.contains(t.path) && matches && when (section) {
+                "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
                 "Duplicates" -> duplicateTrackIds().contains(t.id.toString())
-                "Albums", "Artists", "Folders", "Playlists" -> true
+                "Albums", "Artists", "Folders", "Composers", "Years", "Formats", "Playlists" -> true
                 else -> true
             }
         }
@@ -387,17 +388,24 @@ class MainActivity : Activity() {
         val visible = filteredTracks()
         status.text = when {
             tracks.isEmpty() -> "No local music found. Add audio files and tap ⋮ → Rescan library."
-            section == "Albums" -> "${visible.map { it.album }.distinct().size} albums · ${tracks.size} tracks"
-            section == "Artists" -> "${visible.map { it.artist }.distinct().size} artists · ${tracks.size} tracks"
+            section == "Albums" -> "${visible.map { albumOf(it) }.distinct().size} albums · ${tracks.size} tracks"
+            section == "Artists" -> "${visible.map { artistOf(it) }.distinct().size} artists · ${tracks.size} tracks"
             section == "Folders" -> "${visible.map { it.path }.distinct().size} folders"
+            section == "Composers" -> "${visible.map { it.composer.ifBlank { "Unknown composer" } }.distinct().size} composers"
+            section == "Years" -> "${visible.map { if (it.year > 0) it.year.toString() else "Unknown year" }.distinct().size} release-year groups"
+            section == "Formats" -> "${visible.map { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" } }.distinct().size} file formats"
+            section == "Rated" -> "${visible.size} rated tracks"
             section == "Favorites" -> "${visible.size} favourite tracks"
             section == "Playlists" -> currentPlaylist ?: "${playlistMap.size} playlists · tap ⋮ to manage"
             else -> "${visible.size} songs on this device · sorted by $sortMode"
         }
-        if (section == "Albums" || section == "Artists" || section == "Folders") {
+        if (section in listOf("Albums", "Artists", "Folders", "Composers", "Years", "Formats")) {
             val groups = when (section) {
                 "Albums" -> visible.groupBy { albumOf(it) }
                 "Artists" -> visible.groupBy { artistOf(it) }
+                "Composers" -> visible.groupBy { it.composer.ifBlank { "Unknown composer" } }
+                "Years" -> visible.groupBy { if (it.year > 0) it.year.toString() else "Unknown year" }
+                "Formats" -> visible.groupBy { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" }.uppercase(Locale.ROOT) }
                 else -> visible.groupBy { it.path }
             }
             groups.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (name, group) ->
