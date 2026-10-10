@@ -340,6 +340,7 @@ class MainActivity : Activity() {
         }
     }
     private var currentPlaylist: String? = null
+    private var pendingExportPlaylist: String? = null
 
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
@@ -365,10 +366,12 @@ class MainActivity : Activity() {
             }
         } else if (section == "Playlists" && currentPlaylist == null) {
             playlistMap.forEach { (name, ids) ->
-                songList.addView(listRow(name, "${ids.size} tracks") {
+                val row = listRow(name, "${ids.size} tracks · long-press for options") {
                     currentPlaylist = name
                     renderLibrary()
-                })
+                }
+                row.setOnLongClickListener { managePlaylist(name); true }
+                songList.addView(row)
             }
             songList.addView(listRow("+ Create playlist", "Save selected tracks in a local playlist") { createPlaylist() })
         } else {
@@ -554,6 +557,33 @@ class MainActivity : Activity() {
             .setNeutralButton("Clear queue") { _, _ -> p.clearMediaItems() }.show()
     }
 
+    private fun managePlaylist(name: String) {
+        val options = arrayOf("Play playlist", "Rename playlist", "Export M3U", "Delete playlist")
+        AlertDialog.Builder(this).setTitle(name).setItems(options) { _, which ->
+            when (which) {
+                0 -> {
+                    val ids = playlistMap[name] ?: emptySet()
+                    val selected = tracks.filter { it.id.toString() in ids }
+                    if (selected.isEmpty()) Toast.makeText(this, "This playlist has no matching local tracks", Toast.LENGTH_SHORT).show() else playTracks(selected)
+                }
+                1 -> {
+                    val input = EditText(this).apply { setText(name); setTextColor(fg) }
+                    AlertDialog.Builder(this).setTitle("Rename playlist").setView(input).setPositiveButton("Save") { _, _ ->
+                        val newName = input.text.toString().trim()
+                        if (newName.isNotEmpty() && newName != name) { playlistMap[newName] = playlistMap.remove(name) ?: mutableSetOf(); if (currentPlaylist == name) currentPlaylist = newName; saveLocalSettings(); renderLibrary() }
+                    }.setNegativeButton("Cancel", null).show()
+                }
+                2 -> { pendingExportPlaylist = name; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/x-mpegurl"; putExtra(Intent.EXTRA_TITLE, name.replace(Regex("[^A-Za-z0-9._ -]"), "_") + ".m3u") }; startActivityForResult(intent, 205) }
+                3 -> AlertDialog.Builder(this).setMessage("Delete playlist $name? The music files will not be deleted.").setPositiveButton("Delete") { _, _ -> playlistMap.remove(name); if (currentPlaylist == name) currentPlaylist = null; saveLocalSettings(); renderLibrary() }.setNegativeButton("Cancel", null).show()
+            }
+        }.show()
+    }
+
+    private fun importM3u() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
+        startActivityForResult(intent, 206)
+    }
+
     private fun createPlaylist() {
         val input = EditText(this).apply { hint = "Playlist name"; setTextColor(fg) }
         AlertDialog.Builder(this).setTitle("New offline playlist").setView(input)
@@ -573,19 +603,20 @@ class MainActivity : Activity() {
     }
 
     private fun showMoreMenu() {
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview")
         AlertDialog.Builder(this).setTitle("LaCzek tools").setItems(options) { _, which ->
             when (which) {
                 0 -> scanLibrary()
                 1 -> chooseSort()
                 2 -> createPlaylist()
                 3 -> importAudio()
-                4 -> setSleepTimer()
-                5 -> { dark = !dark; saveLocalSettings(); rebuildUi() }
-                6 -> exportBackup()
-                7 -> importBackup()
-                8 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().remove("last_track").apply(); Toast.makeText(this, "Playback history cleared", Toast.LENGTH_SHORT).show() }
-                9 -> showPlaylistOverview()
+                4 -> importM3u()
+                5 -> setSleepTimer()
+                6 -> { dark = !dark; saveLocalSettings(); rebuildUi() }
+                7 -> exportBackup()
+                8 -> importBackup()
+                9 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().remove("last_track").remove("recent_order").apply(); Toast.makeText(this, "Playback history cleared", Toast.LENGTH_SHORT).show() }
+                10 -> showPlaylistOverview()
             }
         }.show()
     }
