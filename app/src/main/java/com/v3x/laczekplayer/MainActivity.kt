@@ -48,6 +48,7 @@ class MainActivity : Activity() {
     private val customTitles = mutableMapOf<String, String>()
     private val customArtists = mutableMapOf<String, String>()
     private val customAlbums = mutableMapOf<String, String>()
+    private val customArtworkUris = mutableMapOf<String, String>()
     private var section = "Songs"
     private var query = ""
     private val uiHandler = Handler(Looper.getMainLooper())
@@ -101,6 +102,7 @@ class MainActivity : Activity() {
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
         readStringMap(prefs.getString("custom_artists", "{}"), customArtists)
         readStringMap(prefs.getString("custom_albums", "{}"), customAlbums)
+        readStringMap(prefs.getString("custom_artwork_uris", "{}"), customArtworkUris)
         readLongMap(prefs.getString("bookmarks", "{}"), bookmarks)
         readIntMap(prefs.getString("ratings", "{}"), ratings)
         try {
@@ -134,6 +136,7 @@ class MainActivity : Activity() {
             .putString("custom_titles", JSONObject(customTitles as Map<*, *>).toString())
             .putString("custom_artists", JSONObject(customArtists as Map<*, *>).toString())
             .putString("custom_albums", JSONObject(customAlbums as Map<*, *>).toString())
+            .putString("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>).toString())
             .putString("bookmarks", JSONObject(bookmarks as Map<*, *>).toString())
             .putString("ratings", JSONObject(ratings as Map<*, *>).toString())
             .apply()
@@ -376,6 +379,7 @@ class MainActivity : Activity() {
     private var currentPlaylist: String? = null
     private var pendingExportPlaylist: String? = null
     private var pendingCopyTrack: Track? = null
+    private var pendingArtworkTrack: Track? = null
 
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
@@ -440,7 +444,7 @@ class MainActivity : Activity() {
         val options = arrayOf(
             if (favorites.contains(track.id.toString())) "Remove favourite" else "Add to favourites",
             "Play next", "Add to queue", "Add to playlist", "Edit local tags", "Rate track",
-            "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Track details"
+            "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Choose local artwork", "Reset local artwork", "Track details"
         )
         AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
             when (which) {
@@ -455,7 +459,9 @@ class MainActivity : Activity() {
                 8 -> shareTrack(track)
                 9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, fileNameOf(track)) }; startActivityForResult(intent, 208) }
                 10 -> deleteTrack(track)
-                11 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                11 -> chooseArtwork(track)
+                12 -> { customArtworkUris.remove(artworkKey(track)); saveLocalSettings(); updatePlaybackUi(); Toast.makeText(this, "Custom artwork removed", Toast.LENGTH_SHORT).show() }
+                13 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
@@ -486,7 +492,15 @@ class MainActivity : Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
-    private fun artworkUri(t: Track): Uri? = if (t.albumId > 0) Uri.parse("content://media/external/audio/albumart/" + t.albumId) else null
+    private fun artworkKey(t: Track): String = if (t.albumId > 0) "album:" + t.albumId else "track:" + t.id
+    private fun artworkUri(t: Track): Uri? = customArtworkUris[artworkKey(t)]?.let { Uri.parse(it) }
+        ?: if (t.albumId > 0) Uri.parse("content://media/external/audio/albumart/" + t.albumId) else null
+
+    private fun chooseArtwork(track: Track) {
+        pendingArtworkTrack = track
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "image/*" }
+        startActivityForResult(intent, 209)
+    }
 
     private fun mediaItem(t: Track) = MediaItem.Builder().setUri(t.uri).setMediaId(t.id.toString())
         .setMediaMetadata(MediaMetadata.Builder().setTitle(titleOf(t)).setArtist(artistOf(t)).setAlbumTitle(albumOf(t)).setArtworkUri(artworkUri(t)).build()).build()
