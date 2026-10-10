@@ -4,7 +4,7 @@ on:
     branches: ["**"]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,10 +27,19 @@ jobs:
         run: sdkmanager --list_installed
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - name: Publish APK for testing
+      - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: LACZEKPlayer-1.1.0-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+      - name: Publish easy-download GitHub Release APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-build
+          name: LaCzek Player Latest Test Build
+          make_latest: true
+          files: app/build/outputs/apk/debug/app-debug.apk
+          overwrite_files: true
+          fail_on_unmatched_files: true
