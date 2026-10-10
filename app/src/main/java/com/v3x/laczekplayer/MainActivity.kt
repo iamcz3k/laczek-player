@@ -558,6 +558,14 @@ class MainActivity : Activity() {
         nowPlaying.text = if (item == null) "Choose a song to begin" else
             "${item.mediaMetadata.title ?: "Unknown title"}\n${item.mediaMetadata.artist ?: "Unknown artist"}"
         playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+        val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
+        val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
+        val widgetPlaying = p?.isPlaying == true
+        val widgetPrefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        if (widgetPrefs.getString("widget_title", "") != widgetTitle || widgetPrefs.getString("widget_artist", "") != widgetArtist || widgetPrefs.getBoolean("widget_playing", false) != widgetPlaying) {
+            widgetPrefs.edit().putString("widget_title", widgetTitle).putString("widget_artist", widgetArtist).putBoolean("widget_playing", widgetPlaying).apply()
+            PlaybackWidgetProvider.refresh(this)
+        }
         val currentTrack = tracks.firstOrNull { it.id.toString() == item?.mediaId }
         try { val art = currentTrack?.let { artworkUri(it) }; if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null) } catch (_: Exception) { artworkView.setImageDrawable(null) }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
