@@ -308,7 +308,7 @@ class MainActivity : Activity() {
 
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
-            val matches = query.isBlank() || listOf(t.title, t.artist, t.album, t.path).any { it.contains(query, true) }
+            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path).any { it.contains(query, true) }
             matches && when (section) {
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
@@ -356,8 +356,8 @@ class MainActivity : Activity() {
         }
         if (section == "Albums" || section == "Artists" || section == "Folders") {
             val groups = when (section) {
-                "Albums" -> visible.groupBy { it.album }
-                "Artists" -> visible.groupBy { it.artist }
+                "Albums" -> visible.groupBy { albumOf(it) }
+                "Artists" -> visible.groupBy { artistOf(it) }
                 else -> visible.groupBy { it.path }
             }
             groups.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (name, group) ->
@@ -373,7 +373,7 @@ class MainActivity : Activity() {
             songList.addView(listRow("+ Create playlist", "Save selected tracks in a local playlist") { createPlaylist() })
         } else {
             visible.forEach { track ->
-                val row = listRow(track.title, "${track.artist}  ·  ${track.album}  ·  ${formatTime(track.duration)}") { playTrack(track) }
+                val row = listRow(titleOf(track), "${artistOf(track)}  ·  ${albumOf(track)}  ·  ${formatTime(track.duration)}") { playTrack(track) }
                 row.setOnLongClickListener { showTrackMenu(track); true }
                 songList.addView(row)
             }
@@ -401,22 +401,53 @@ class MainActivity : Activity() {
     private fun showTrackMenu(track: Track) {
         val options = arrayOf(
             if (favorites.contains(track.id.toString())) "Remove favourite" else "Add to favourites",
-            "Play next", "Add to queue", "Add to playlist", "Share audio", "Track details"
+            "Play next", "Add to queue", "Add to playlist", "Edit local tags", "Rate track",
+            "Save playback bookmark", "Jump to bookmark", "Share audio", "Track details"
         )
-        AlertDialog.Builder(this).setTitle(track.title).setItems(options) { _, which ->
+        AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
             when (which) {
                 0 -> { if (!favorites.add(track.id.toString())) favorites.remove(track.id.toString()); saveLocalSettings(); renderLibrary() }
                 1 -> controller?.let { it.addMediaItem(0, mediaItem(track)); Toast.makeText(this, "Queued next", Toast.LENGTH_SHORT).show() }
                 2 -> { controller?.addMediaItem(mediaItem(track)); Toast.makeText(this, "Added to queue", Toast.LENGTH_SHORT).show() }
                 3 -> addTrackToPlaylist(track)
-                4 -> shareTrack(track)
-                5 -> AlertDialog.Builder(this).setMessage("Title: ${track.title}\nArtist: ${track.artist}\nAlbum: ${track.album}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                4 -> editLocalTags(track)
+                5 -> rateTrack(track)
+                6 -> { val p = controller; bookmarks[track.id.toString()] = if (p?.currentMediaItem?.mediaId == track.id.toString()) p.currentPosition else 0L; saveLocalSettings(); Toast.makeText(this, "Bookmark saved locally", Toast.LENGTH_SHORT).show() }
+                7 -> { val position = bookmarks[track.id.toString()]; if (position != null) { playTrack(track); controller?.seekTo(position) } else Toast.makeText(this, "No bookmark saved for this track", Toast.LENGTH_SHORT).show() }
+                8 -> shareTrack(track)
+                9 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
 
+    private fun editLocalTags(track: Track) {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), 0, dp(18), 0) }
+        val title = EditText(this).apply { hint = "Song title"; setText(titleOf(track)); setTextColor(fg) }
+        val artist = EditText(this).apply { hint = "Artist"; setText(artistOf(track)); setTextColor(fg) }
+        val album = EditText(this).apply { hint = "Album"; setText(albumOf(track)); setTextColor(fg) }
+        box.addView(title); box.addView(artist); box.addView(album)
+        AlertDialog.Builder(this).setTitle("Edit tags in LaCzek Player").setMessage("These overrides are stored locally in the app; the original audio file is not modified.")
+            .setView(box).setPositiveButton("Save") { _, _ ->
+                val id = track.id.toString()
+                customTitles[id] = title.text.toString().trim().ifEmpty { track.title }
+                customArtists[id] = artist.text.toString().trim().ifEmpty { track.artist }
+                customAlbums[id] = album.text.toString().trim().ifEmpty { track.album }
+                saveLocalSettings(); renderLibrary()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun rateTrack(track: Track) {
+        val choices = arrayOf("Unrated", "★", "★★", "★★★", "★★★★", "★★★★★")
+        val id = track.id.toString()
+        AlertDialog.Builder(this).setTitle("Rate " + titleOf(track))
+            .setSingleChoiceItems(choices, (ratings[id] ?: 0).coerceIn(0, 5)) { dialog, which ->
+                if (which == 0) ratings.remove(id) else ratings[id] = which
+                saveLocalSettings(); dialog.dismiss(); Toast.makeText(this, "Rating saved on this phone", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
     private fun mediaItem(t: Track) = MediaItem.Builder().setUri(t.uri).setMediaId(t.id.toString())
-        .setMediaMetadata(MediaMetadata.Builder().setTitle(t.title).setArtist(t.artist).setAlbumTitle(t.album).build()).build()
+        .setMediaMetadata(MediaMetadata.Builder().setTitle(titleOf(t)).setArtist(artistOf(t)).setAlbumTitle(albumOf(t)).build()).build()
 
     private fun connectPlayback() {
         val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
