@@ -24,5 +24,15 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+        <receiver android:name=".PlaybackWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.v3x.laczekplayer.WIDGET_OPEN" />
+                <action android:name="com.v3x.laczekplayer.WIDGET_PLAY_PAUSE" />
+                <action android:name="com.v3x.laczekplayer.WIDGET_NEXT" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/laczek_player_widget_info" />
+        </receiver>
     </application>
 </manifest>
+
