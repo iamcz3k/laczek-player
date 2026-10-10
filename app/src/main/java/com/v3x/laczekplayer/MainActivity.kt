@@ -53,6 +53,8 @@ class MainActivity : Activity() {
     private var sleepHandler: Handler? = null
     private var sleepRunnable: Runnable? = null
     private var lyricText = ""
+    private var lyricHandler: Handler? = null
+    private var lyricRunnable: Runnable? = null
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
     private lateinit var songList: LinearLayout
@@ -650,9 +652,55 @@ class MainActivity : Activity() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
         startActivityForResult(i, 201)
     }
+    private data class TimedLyric(val timeMs: Long, val text: String)
+
+    private fun parseLyrics(): List<TimedLyric> {
+        val pattern = Regex("[[]([0-9]{1,2}):([0-9]{2})(?:[.:]([0-9]{1,3}))?]")
+        val parsed = mutableListOf<TimedLyric>()
+        lyricText.lineSequence().forEach { line ->
+            val matches = pattern.findAll(line).toList()
+            val text = pattern.replace(line, "").trim()
+            matches.forEach { match ->
+                val minutes = match.groupValues[1].toLongOrNull() ?: 0L
+                val seconds = match.groupValues[2].toLongOrNull() ?: 0L
+                val fraction = match.groupValues[3].padEnd(3, '0').take(3).toLongOrNull() ?: 0L
+                parsed.add(TimedLyric(minutes * 60_000L + seconds * 1_000L + fraction, text))
+            }
+        }
+        if (parsed.isEmpty()) return lyricText.lines().filter { it.isNotBlank() }.map { TimedLyric(0L, it) }
+        return parsed.sortedBy { it.timeMs }
+    }
+
     private fun showLyrics() {
-        AlertDialog.Builder(this).setTitle("Local lyrics").setMessage(if (lyricText.isBlank()) "No lyrics loaded. Choose a local .lrc or .txt lyrics file." else lyricText)
-            .setPositiveButton("Load file") { _, _ -> chooseLyrics() }.setNegativeButton("Close", null).show()
+        if (lyricText.isBlank()) { chooseLyrics(); return }
+        val lines = parseLyrics()
+        val scroll = ScrollView(this)
+        val textView = TextView(this).apply {
+            setTextColor(fg); textSize = 17f
+            setPadding(dp(16), dp(12), dp(16), dp(18))
+            setLineSpacing(dp(8).toFloat(), 1f)
+        }
+        scroll.addView(textView)
+        val dialog = AlertDialog.Builder(this).setTitle("Synchronized local lyrics")
+            .setView(scroll).setPositiveButton("Load another file") { _, _ -> chooseLyrics() }
+            .setNegativeButton("Close", null).create()
+        lyricHandler?.let { handler -> lyricRunnable?.let { handler.removeCallbacks(it) } }
+        lyricHandler = Handler(Looper.getMainLooper())
+        lyricRunnable = object : Runnable {
+            override fun run() {
+                val position = controller?.currentPosition ?: 0L
+                val current = lines.indexOfLast { it.timeMs <= position }.coerceAtLeast(0)
+                textView.text = lines.mapIndexed { index, line -> (if (index == current) "▶  " else "    ") + line.text }.joinToString("\n\n")
+                scroll.post { scroll.smoothScrollTo(0, (current * textView.lineHeight * 2).coerceAtLeast(0)) }
+                lyricHandler?.postDelayed(this, 300L)
+            }
+        }
+        dialog.setOnDismissListener {
+            lyricHandler?.let { handler -> lyricRunnable?.let { handler.removeCallbacks(it) } }
+            lyricRunnable = null
+        }
+        dialog.show()
+        lyricRunnable?.run()
     }
     private fun showEqualizer() {
         val sessionId = PlaybackService.audioSessionId
