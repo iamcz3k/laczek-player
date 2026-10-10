@@ -343,6 +343,7 @@ class MainActivity : Activity() {
     }
     private var currentPlaylist: String? = null
     private var pendingExportPlaylist: String? = null
+    private var pendingCopyTrack: Track? = null
 
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
@@ -407,7 +408,7 @@ class MainActivity : Activity() {
         val options = arrayOf(
             if (favorites.contains(track.id.toString())) "Remove favourite" else "Add to favourites",
             "Play next", "Add to queue", "Add to playlist", "Edit local tags", "Rate track",
-            "Save playback bookmark", "Jump to bookmark", "Share audio", "Track details"
+            "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Track details"
         )
         AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
             when (which) {
@@ -420,7 +421,9 @@ class MainActivity : Activity() {
                 6 -> { val p = controller; bookmarks[track.id.toString()] = if (p?.currentMediaItem?.mediaId == track.id.toString()) p.currentPosition else 0L; saveLocalSettings(); Toast.makeText(this, "Bookmark saved locally", Toast.LENGTH_SHORT).show() }
                 7 -> { val position = bookmarks[track.id.toString()]; if (position != null) { playTrack(track); controller?.seekTo(position) } else Toast.makeText(this, "No bookmark saved for this track", Toast.LENGTH_SHORT).show() }
                 8 -> shareTrack(track)
-                9 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, titleOf(track) + ".audio") }; startActivityForResult(intent, 208) }
+                10 -> deleteTrack(track)
+                11 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
@@ -838,6 +841,19 @@ class MainActivity : Activity() {
                 controller?.setMediaItems(items); controller?.prepare(); controller?.play()
             }
         }
+    }
+
+    private fun deleteTrack(track: Track) {
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                val request = MediaStore.createDeleteRequest(contentResolver, listOf(track.uri))
+                startIntentSenderForResult(request.intentSender, 207, null, 0, 0, 0)
+            } else {
+                val deleted = contentResolver.delete(track.uri, null, null)
+                if (deleted > 0) { Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show(); scanLibrary() }
+                else Toast.makeText(this, "Android did not delete this file", Toast.LENGTH_LONG).show()
+            }
+        } catch (_: Exception) { Toast.makeText(this, "Deletion was denied or unsupported by this device", Toast.LENGTH_LONG).show() }
     }
 
     private fun shareTrack(track: Track) {
