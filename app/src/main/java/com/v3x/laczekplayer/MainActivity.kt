@@ -32,7 +32,8 @@ import java.util.concurrent.ExecutionException
 
 private data class Track(
     val id: Long, val title: String, val artist: String, val album: String,
-    val path: String, val duration: Long, val uri: Uri
+    val path: String, val duration: Long, val uri: Uri,
+    val albumId: Long, val composer: String, val year: Int, val sizeBytes: Long, val mimeType: String
 )
 
 class MainActivity : Activity() {
@@ -62,6 +63,7 @@ class MainActivity : Activity() {
     private lateinit var search: EditText
     private lateinit var status: TextView
     private lateinit var nowPlaying: TextView
+    private lateinit var artworkView: ImageView
     private lateinit var playButton: Button
     private lateinit var seek: SeekBar
     private lateinit var timeText: TextView
@@ -212,7 +214,11 @@ class MainActivity : Activity() {
             setTextColor(fg)
             maxLines = 2
         }
-        playerPanel.addView(nowPlaying)
+        val nowRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        artworkView = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; background = roundedBackground(bg, dp(12)); contentDescription = "Album artwork" }
+        nowRow.addView(artworkView, LinearLayout.LayoutParams(dp(58), dp(58)))
+        nowRow.addView(nowPlaying, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
+        playerPanel.addView(nowRow)
         seek = SeekBar(this).apply {
             max = 1000
             progressTintList = android.content.res.ColorStateList.valueOf(orange)
@@ -285,8 +291,10 @@ class MainActivity : Activity() {
     private fun scanLibrary() {
         tracks.clear()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
         val columns = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.RELATIVE_PATH)
+            MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.DURATION, pathColumn, MediaStore.Audio.Media.ALBUM_ID,
+            MediaStore.Audio.Media.COMPOSER, MediaStore.Audio.Media.YEAR, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE)
         try {
             contentResolver.query(collection, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null,
                 MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")?.use { c ->
@@ -295,12 +303,20 @@ class MainActivity : Activity() {
                 val artist = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
                 val album = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
                 val duration = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                val path = c.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                val path = c.getColumnIndex(pathColumn)
+                val albumId = c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+                val composer = c.getColumnIndex(MediaStore.Audio.Media.COMPOSER)
+                val year = c.getColumnIndex(MediaStore.Audio.Media.YEAR)
+                val size = c.getColumnIndex(MediaStore.Audio.Media.SIZE)
+                val mime = c.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
                 while (c.moveToNext()) {
                     val trackId = c.getLong(id)
                     tracks.add(Track(trackId, c.getString(title) ?: "Unknown title", c.getString(artist) ?: "Unknown artist",
                         c.getString(album) ?: "Unknown album", if (path >= 0) c.getString(path) ?: "Unknown folder" else "Unknown folder",
-                        c.getLong(duration), ContentUris.withAppendedId(collection, trackId)))
+                        c.getLong(duration), ContentUris.withAppendedId(collection, trackId),
+                        if (albumId >= 0) c.getLong(albumId) else -1L, if (composer >= 0) c.getString(composer) ?: "" else "",
+                        if (year >= 0) c.getInt(year) else 0, if (size >= 0) c.getLong(size) else 0L,
+                        if (mime >= 0) c.getString(mime) ?: "" else ""))
                 }
             }
         } catch (_: Exception) {
@@ -311,7 +327,7 @@ class MainActivity : Activity() {
 
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
-            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path).any { it.contains(query, true) }
+            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
             matches && when (section) {
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
@@ -424,7 +440,7 @@ class MainActivity : Activity() {
                 8 -> shareTrack(track)
                 9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, fileNameOf(track)) }; startActivityForResult(intent, 208) }
                 10 -> deleteTrack(track)
-                11 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                11 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
@@ -455,8 +471,10 @@ class MainActivity : Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun artworkUri(t: Track): Uri? = if (t.albumId > 0) Uri.parse("content://media/external/audio/albumart/" + t.albumId) else null
+
     private fun mediaItem(t: Track) = MediaItem.Builder().setUri(t.uri).setMediaId(t.id.toString())
-        .setMediaMetadata(MediaMetadata.Builder().setTitle(titleOf(t)).setArtist(artistOf(t)).setAlbumTitle(albumOf(t)).build()).build()
+        .setMediaMetadata(MediaMetadata.Builder().setTitle(titleOf(t)).setArtist(artistOf(t)).setAlbumTitle(albumOf(t)).setArtworkUri(artworkUri(t)).build()).build()
 
     private fun connectPlayback() {
         val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
@@ -525,6 +543,8 @@ class MainActivity : Activity() {
         nowPlaying.text = if (item == null) "Choose a song to begin" else
             "${item.mediaMetadata.title ?: "Unknown title"}\n${item.mediaMetadata.artist ?: "Unknown artist"}"
         playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+        val currentTrack = tracks.firstOrNull { it.id.toString() == item?.mediaId }
+        try { val art = currentTrack?.let { artworkUri(it) }; if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null) } catch (_: Exception) { artworkView.setImageDrawable(null) }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
         val position = p?.currentPosition?.coerceAtLeast(0) ?: 0L
         seek.progress = if (duration > 0) (position * 1000 / duration).toInt() else 0
@@ -914,6 +934,7 @@ class MainActivity : Activity() {
         updatePlaybackUi()
         window.statusBarColor = bg; window.navigationBarColor = bg
     }
+    private fun formatBytes(bytes: Long): String = when { bytes <= 0 -> "Unknown"; bytes < 1024 -> "$bytes B"; bytes < 1024 * 1024 -> String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0); else -> String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0)) }
     private fun formatTime(ms: Long): String = String.format(Locale.ROOT, "%d:%02d", ms.coerceAtLeast(0) / 60000, (ms.coerceAtLeast(0) / 1000) % 60)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
