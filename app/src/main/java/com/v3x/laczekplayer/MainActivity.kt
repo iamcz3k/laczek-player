@@ -15,6 +15,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -421,7 +422,7 @@ class MainActivity : Activity() {
                 6 -> { val p = controller; bookmarks[track.id.toString()] = if (p?.currentMediaItem?.mediaId == track.id.toString()) p.currentPosition else 0L; saveLocalSettings(); Toast.makeText(this, "Bookmark saved locally", Toast.LENGTH_SHORT).show() }
                 7 -> { val position = bookmarks[track.id.toString()]; if (position != null) { playTrack(track); controller?.seekTo(position) } else Toast.makeText(this, "No bookmark saved for this track", Toast.LENGTH_SHORT).show() }
                 8 -> shareTrack(track)
-                9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, titleOf(track) + ".audio") }; startActivityForResult(intent, 208) }
+                9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, fileNameOf(track)) }; startActivityForResult(intent, 208) }
                 10 -> deleteTrack(track)
                 11 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
@@ -790,6 +791,22 @@ class MainActivity : Activity() {
                     } catch (_: Exception) { Toast.makeText(this, "Could not restore this backup", Toast.LENGTH_SHORT).show() }
                 }
             }
+            207 -> {
+                if (resultCode == RESULT_OK) { Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show(); scanLibrary() }
+            }
+            208 -> {
+                val target = data.data
+                val source = pendingCopyTrack
+                if (target != null && source != null) {
+                    try {
+                        contentResolver.openInputStream(source.uri)?.use { input ->
+                            contentResolver.openOutputStream(target)?.use { output -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("Could not read source audio")
+                        Toast.makeText(this, "Audio file copied", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { Toast.makeText(this, "Could not copy this audio file", Toast.LENGTH_LONG).show() }
+                }
+                pendingCopyTrack = null
+            }
             205 -> {
                 val name = pendingExportPlaylist
                 val ids = if (name != null) playlistMap[name] ?: emptySet() else emptySet()
@@ -854,6 +871,14 @@ class MainActivity : Activity() {
                 else Toast.makeText(this, "Android did not delete this file", Toast.LENGTH_LONG).show()
             }
         } catch (_: Exception) { Toast.makeText(this, "Deletion was denied or unsupported by this device", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun fileNameOf(track: Track): String {
+        return try {
+            contentResolver.query(track.uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            } ?: titleOf(track) + ".audio"
+        } catch (_: Exception) { titleOf(track) + ".audio" }
     }
 
     private fun shareTrack(track: Track) {
