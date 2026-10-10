@@ -1,34 +1,37 @@
 # LaCzek Player
 
-An offline-first Android music player. Playback and library management operate on local files. The app does not implement streaming, accounts, cloud services, online lyrics, or online metadata APIs.
+An offline-first Android music player. Playback, library management, playlists, ratings, bookmarks, and settings are stored and used locally. No streaming, accounts, cloud services, or online metadata/lyrics APIs are implemented.
 
-## Current test build features
-- Scan the device's local audio library
-- Browse songs, albums, artists, and folders
-- Search local songs and metadata
-- Local playback with play/pause, next/previous, seeking, shuffle, repeat, and a playback queue
-- Background playback through Android Media3 MediaSessionService, including system media controls
-- Local favourites and named playlists
-- Track details and sharing of local audio files
+## Features in the current test build
+- Scan local audio and browse songs, albums, artists, and folders
+- Search local title, artist, album, composer, year, folder, and format metadata
+- Album artwork in the player when embedded/local artwork is available
+- Local play/pause, next/previous, seeking, shuffle, repeat, queue inspection, and playback speed
+- Background playback through Android Media3 MediaSessionService and Android system media controls
+- Local favourites, recent/most-played views, duplicate title/artist detection, and named playlists
+- Create, rename, delete, and play playlists; import/export M3U playlists with local-track matching
+- Edit app-local title/artist/album overrides (does not rewrite the audio file's embedded tags)
+- Local 0–5 star ratings and per-track playback bookmarks
 - Built-in Android equalizer where supported
-- Load local LRC or text lyric files
-- Sleep timer, playback speed control, and seek by 15 seconds
-- Dark interface with LaCzek orange accents
-- Local JSON settings backup and restore
-- Local preferences for favourites, playlists, theme, and sort mode
+- Load local LRC/TXT lyrics; timestamped LRC lines follow playback position
+- Sleep timer, stop after current track, fade-out timer, and ±15-second seeking
+- Share/copy local audio files and request Android consent before deleting supported media files
+- File details including composer/year/format/size when supplied by Android's media index
+- Dark/light appearance with LaCzek orange accents
+- Local JSON backup/restore for favourites, playlists, theme, sort mode, tags, ratings, and bookmarks
 
 ## Download the latest APK
 **Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/app-debug.apk
 
-If a release asset is not available yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), select the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.1.0-debug** artifact ZIP.
+If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.2.0-debug** artifact ZIP.
 
-This is a debug build intended for testing, not a production-signed release. Android may require you to allow installation from the browser or file manager.
+This is a debug APK for testing, not a production-signed release. Android may ask you to allow installation from the browser or file manager.
 
 ## Build
 Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDebug`.
 
 - Package: `com.v3x.laczekplayer`
-- Version: 1.1.0
+- Version: 1.2.0
 
-## Offline and capability notes
-The app does not need an internet connection for local playback. Equalizer support varies by device. Lyrics are read from files selected on the device; synchronized display requires timed lyric data and is still being developed. Some features from the long-term feature wishlist are not implemented yet.
+## Important limits
+This is still an evolving test build, not every item from the original 150+ feature wishlist is implemented. Hardware-dependent audio effects vary by device. Custom tag edits are app-local overrides, not embedded-file tag rewrites. No network permission is requested by the app.
