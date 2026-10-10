@@ -35,11 +35,12 @@ import java.util.concurrent.ExecutionException
 private data class Track(
     val id: Long, val title: String, val artist: String, val album: String,
     val path: String, val duration: Long, val uri: Uri,
-    val albumId: Long, val composer: String, val year: Int, val sizeBytes: Long, val mimeType: String
+    val albumId: Long, val composer: String, val year: Int, val sizeBytes: Long, val mimeType: String, val genre: String
 )
 
 class MainActivity : Activity() {
     private val tracks = mutableListOf<Track>()
+    private val genreByTrackId = mutableMapOf<Long, String>()
     private val favorites = mutableSetOf<String>()
     private val hiddenFolders = mutableSetOf<String>()
     private val playlistMap = linkedMapOf<String, MutableSet<String>>()
@@ -204,7 +205,7 @@ class MainActivity : Activity() {
         root.addView(search, LinearLayout.LayoutParams(-1, dp(48)))
         val navScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, dp(8)) }
-        listOf("Songs", "Albums", "Artists", "Folders", "Composers", "Years", "Formats", "Recent", "Most played", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
+        listOf("Songs", "Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats", "Recent", "Most played", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
             nav.addView(actionButton(name) { section = name; currentPlaylist = null; renderLibrary() }.apply {
                 textSize = 12f
                 setPadding(dp(10), 0, dp(10), 0)
@@ -307,6 +308,7 @@ class MainActivity : Activity() {
 
     private fun scanLibrary() {
         tracks.clear()
+        loadGenreMap()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
         val columns = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
@@ -333,7 +335,7 @@ class MainActivity : Activity() {
                         c.getLong(duration), ContentUris.withAppendedId(collection, trackId),
                         if (albumId >= 0) c.getLong(albumId) else -1L, if (composer >= 0) c.getString(composer) ?: "" else "",
                         if (year >= 0) c.getInt(year) else 0, if (size >= 0) c.getLong(size) else 0L,
-                        if (mime >= 0) c.getString(mime) ?: "" else ""))
+                        if (mime >= 0) c.getString(mime) ?: "" else "", genreByTrackId[trackId] ?: "Unknown genre"))
                 }
             }
         } catch (_: Exception) {
@@ -342,16 +344,36 @@ class MainActivity : Activity() {
         renderLibrary()
     }
 
+    private fun loadGenreMap() {
+        genreByTrackId.clear()
+        try {
+            contentResolver.query(MediaStore.Audio.Genres.EXTERNAL_CONTENT_URI,
+                arrayOf(MediaStore.Audio.Genres._ID, MediaStore.Audio.Genres.NAME), null, null, MediaStore.Audio.Genres.NAME + " COLLATE NOCASE ASC")?.use { genres ->
+                val idColumn = genres.getColumnIndexOrThrow(MediaStore.Audio.Genres._ID)
+                val nameColumn = genres.getColumnIndexOrThrow(MediaStore.Audio.Genres.NAME)
+                while (genres.moveToNext()) {
+                    val genreId = genres.getLong(idColumn)
+                    val genreName = genres.getString(nameColumn) ?: "Unknown genre"
+                    val membersUri = MediaStore.Audio.Genres.Members.getContentUri("external", genreId)
+                    contentResolver.query(membersUri, arrayOf(MediaStore.Audio.Media._ID), null, null, null)?.use { members ->
+                        val memberId = members.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                        while (members.moveToNext()) genreByTrackId[members.getLong(memberId)] = genreName
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
-            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
+            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.genre, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
             !hiddenFolders.contains(t.path) && matches && when (section) {
                 "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
                 "Duplicates" -> duplicateTrackIds().contains(t.id.toString())
-                "Albums", "Artists", "Folders", "Composers", "Years", "Formats", "Playlists" -> true
+                "Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats", "Playlists" -> true
                 else -> true
             }
         }
@@ -391,6 +413,7 @@ class MainActivity : Activity() {
             section == "Albums" -> "${visible.map { albumOf(it) }.distinct().size} albums · ${tracks.size} tracks"
             section == "Artists" -> "${visible.map { artistOf(it) }.distinct().size} artists · ${tracks.size} tracks"
             section == "Folders" -> "${visible.map { it.path }.distinct().size} folders"
+            section == "Genres" -> "${visible.map { it.genre }.distinct().size} genres"
             section == "Composers" -> "${visible.map { it.composer.ifBlank { "Unknown composer" } }.distinct().size} composers"
             section == "Years" -> "${visible.map { if (it.year > 0) it.year.toString() else "Unknown year" }.distinct().size} release-year groups"
             section == "Formats" -> "${visible.map { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" } }.distinct().size} file formats"
@@ -399,10 +422,11 @@ class MainActivity : Activity() {
             section == "Playlists" -> currentPlaylist ?: "${playlistMap.size} playlists · tap ⋮ to manage"
             else -> "${visible.size} songs on this device · sorted by $sortMode"
         }
-        if (section in listOf("Albums", "Artists", "Folders", "Composers", "Years", "Formats")) {
+        if (section in listOf("Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats")) {
             val groups = when (section) {
                 "Albums" -> visible.groupBy { albumOf(it) }
                 "Artists" -> visible.groupBy { artistOf(it) }
+                "Genres" -> visible.groupBy { it.genre }
                 "Composers" -> visible.groupBy { it.composer.ifBlank { "Unknown composer" } }
                 "Years" -> visible.groupBy { if (it.year > 0) it.year.toString() else "Unknown year" }
                 "Formats" -> visible.groupBy { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" }.uppercase(Locale.ROOT) }
