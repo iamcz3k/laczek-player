@@ -9,6 +9,11 @@ import androidx.media3.session.MediaSessionService
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
 
+    companion object {
+        @Volatile var audioSessionId: Int = 0
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
         val player = ExoPlayer.Builder(this).build().apply {
@@ -21,6 +26,7 @@ class PlaybackService : MediaSessionService() {
             )
             setHandleAudioBecomingNoisy(true)
         }
+        audioSessionId = player.audioSessionId
         session = MediaSession.Builder(this, player).build()
     }
 
@@ -32,6 +38,7 @@ class PlaybackService : MediaSessionService() {
             release()
         }
         session = null
+        audioSessionId = 0
         super.onDestroy()
     }
 }
