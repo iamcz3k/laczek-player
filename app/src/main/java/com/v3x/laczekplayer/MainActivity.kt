@@ -190,7 +190,7 @@ class MainActivity : Activity() {
         val navScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, dp(8)) }
         listOf("Songs", "Albums", "Artists", "Folders", "Recent", "Most played", "Duplicates", "Favorites", "Playlists").forEach { name ->
-            nav.addView(actionButton(name) { section = name; renderLibrary() }.apply {
+            nav.addView(actionButton(name) { section = name; currentPlaylist = null; renderLibrary() }.apply {
                 textSize = 12f
                 setPadding(dp(10), 0, dp(10), 0)
             })
