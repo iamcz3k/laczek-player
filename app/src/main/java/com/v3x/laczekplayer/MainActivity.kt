@@ -276,7 +276,7 @@ class MainActivity : Activity() {
             val names = playlistMap.keys.toList()
             val choices = listOf("All songs") + names
             val selected = currentPlaylist
-            if (selected != null) result = result.filter { selected in (playlistMap[currentPlaylist] ?: emptySet()) }
+            if (selected != null) result = result.filter { it.id.toString() in (playlistMap[selected] ?: emptySet()) }
         }
         return when (sortMode) {
             "Artist" -> result.sortedBy { it.artist.lowercase(Locale.ROOT) }
@@ -547,6 +547,45 @@ class MainActivity : Activity() {
                     } catch (_: Exception) { Toast.makeText(this, "Could not read this lyrics file", Toast.LENGTH_SHORT).show() }
                 }
             }
+            203 -> {
+                data.data?.let { uri ->
+                    try {
+                        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+                        val backup = JSONObject()
+                            .put("favorites", JSONArray(favorites.toList()))
+                            .put("dark", dark)
+                            .put("sort", sortMode)
+                            .put("playlists", JSONArray(prefs.getString("playlists", "[]")))
+                        contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(backup.toString(2)) }
+                        Toast.makeText(this, "Local backup exported", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { Toast.makeText(this, "Backup export failed", Toast.LENGTH_SHORT).show() }
+                }
+            }
+            204 -> {
+                data.data?.let { uri ->
+                    try {
+                        val backup = contentResolver.openInputStream(uri)?.bufferedReader()?.use { JSONObject(it.readText()) }
+                            ?: throw IllegalStateException("Empty backup")
+                        favorites.clear()
+                        val favs = backup.optJSONArray("favorites") ?: JSONArray()
+                        for (i in 0 until favs.length()) favorites.add(favs.optString(i))
+                        dark = backup.optBoolean("dark", true)
+                        sortMode = backup.optString("sort", "Title")
+                        playlistMap.clear()
+                        val lists = backup.optJSONArray("playlists") ?: JSONArray()
+                        for (i in 0 until lists.length()) {
+                            val item = lists.getJSONObject(i)
+                            val ids = item.optJSONArray("ids") ?: JSONArray()
+                            val set = mutableSetOf<String>()
+                            for (j in 0 until ids.length()) set.add(ids.optString(j))
+                            playlistMap[item.optString("name", "Playlist")] = set
+                        }
+                        saveLocalSettings()
+                        rebuildUi()
+                        Toast.makeText(this, "Local backup restored", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { Toast.makeText(this, "Could not restore this backup", Toast.LENGTH_SHORT).show() }
+                }
+            }
             202 -> {
                 val uris = mutableListOf<Uri>()
                 data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
@@ -585,8 +624,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         equalizer?.release()
-        controller?.release()
-        controllerFuture?.cancel(false)
+        controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onDestroy()
     }
 }
