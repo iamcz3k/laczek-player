@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.media.audiofx.Equalizer
+import android.media.audiofx.BassBoost
+import android.media.audiofx.Virtualizer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -52,6 +54,8 @@ class MainActivity : Activity() {
     private var controller: MediaController? = null
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
     private var equalizer: Equalizer? = null
+    private var bassBoost: BassBoost? = null
+    private var virtualizer: Virtualizer? = null
     private var sleepHandler: Handler? = null
     private var sleepRunnable: Runnable? = null
     private var lyricText = ""
@@ -753,11 +757,28 @@ class MainActivity : Activity() {
         if (sessionId <= 0) { Toast.makeText(this, "Start a song before opening the equalizer", Toast.LENGTH_SHORT).show(); return }
         try {
             equalizer?.release()
+            bassBoost?.release()
+            virtualizer?.release()
             equalizer = Equalizer(0, sessionId).apply { enabled = true }
+            bassBoost = try { BassBoost(0, sessionId).apply { enabled = true } } catch (_: Exception) { null }
+            virtualizer = try { Virtualizer(0, sessionId).apply { enabled = true } } catch (_: Exception) { null }
             val eq = equalizer!!
-            val bands = (0 until eq.numberOfBands).map { it.toShort() }
-            val names = bands.map { band -> "${eq.getCenterFreq(band) / 1000} Hz" }.toTypedArray()
             val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), 0, dp(16), 0) }
+            val presetNames = (0 until eq.numberOfPresets).map { eq.getPresetName(it.toShort()) }.toTypedArray()
+            if (presetNames.isNotEmpty()) {
+                layout.addView(TextView(this).apply { text = "EQ preset"; setTextColor(fg) })
+                val spinner = Spinner(this)
+                spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, presetNames)
+                layout.addView(spinner)
+                spinner.setSelection(eq.currentPreset.toInt().coerceIn(0, presetNames.lastIndex))
+                spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                    override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                    override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                        try { eq.usePreset(position.toShort()) } catch (_: Exception) {}
+                    }
+                }
+            }
+            val bands = (0 until eq.numberOfBands).map { it.toShort() }
             for (band in bands) {
                 val label = TextView(this).apply { text = "${eq.getCenterFreq(band) / 1000} Hz"; setTextColor(fg) }
                 val slider = SeekBar(this).apply {
@@ -772,13 +793,37 @@ class MainActivity : Activity() {
                 }
                 layout.addView(label); layout.addView(slider)
             }
-            AlertDialog.Builder(this).setTitle("Equalizer").setView(ScrollView(this).apply { addView(layout) })
-                .setNeutralButton("Disable") { _, _ -> eq.enabled = false }
+            bassBoost?.let { effect ->
+                layout.addView(TextView(this).apply { text = "Bass boost"; setTextColor(fg) })
+                layout.addView(SeekBar(this).apply {
+                    max = 1000
+                    progress = effect.roundedStrength.toInt()
+                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(s: SeekBar?, v: Int, user: Boolean) { if (user) try { effect.setStrength(v.toShort()) } catch (_: Exception) {} }
+                        override fun onStartTrackingTouch(s: SeekBar?) {}
+                        override fun onStopTrackingTouch(s: SeekBar?) {}
+                    })
+                })
+            }
+            virtualizer?.let { effect ->
+                layout.addView(TextView(this).apply { text = "Virtualizer"; setTextColor(fg) })
+                layout.addView(SeekBar(this).apply {
+                    max = 1000
+                    progress = effect.roundedStrength.toInt()
+                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(s: SeekBar?, v: Int, user: Boolean) { if (user) try { effect.setStrength(v.toShort()) } catch (_: Exception) {} }
+                        override fun onStartTrackingTouch(s: SeekBar?) {}
+                        override fun onStopTrackingTouch(s: SeekBar?) {}
+                    })
+                })
+            }
+            AlertDialog.Builder(this).setTitle("Audio effects").setView(ScrollView(this).apply { addView(layout) })
+                .setNeutralButton("Disable all") { _, _ -> eq.enabled = false; bassBoost?.enabled = false; virtualizer?.enabled = false }
                 .setPositiveButton("Done", null).show()
-        } catch (_: Exception) { Toast.makeText(this, "Equalizer is not supported on this device", Toast.LENGTH_LONG).show() }
+        } catch (_: Exception) { Toast.makeText(this, "Audio effects are not supported on this device", Toast.LENGTH_LONG).show() }
     }
 
-    private fun importAudio() {
+        private fun importAudio() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true) }
         startActivityForResult(i, 202)
     }
@@ -962,6 +1007,8 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         equalizer?.release()
+        bassBoost?.release()
+        virtualizer?.release()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onDestroy()
     }
