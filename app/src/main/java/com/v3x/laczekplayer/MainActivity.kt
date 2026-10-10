@@ -189,7 +189,7 @@ class MainActivity : Activity() {
         root.addView(search, LinearLayout.LayoutParams(-1, dp(48)))
         val navScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
         val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(8), 0, dp(8)) }
-        listOf("Songs", "Albums", "Artists", "Folders", "Recent", "Most played", "Favorites", "Playlists").forEach { name ->
+        listOf("Songs", "Albums", "Artists", "Folders", "Recent", "Most played", "Duplicates", "Favorites", "Playlists").forEach { name ->
             nav.addView(actionButton(name) { section = name; renderLibrary() }.apply {
                 textSize = 12f
                 setPadding(dp(10), 0, dp(10), 0)
@@ -332,6 +332,7 @@ class MainActivity : Activity() {
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
+                "Duplicates" -> duplicateTrackIds().contains(t.id.toString())
                 "Albums", "Artists", "Folders", "Playlists" -> true
                 else -> true
             }
@@ -550,6 +551,10 @@ class MainActivity : Activity() {
         seek.progress = if (duration > 0) (position * 1000 / duration).toInt() else 0
         timeText.text = "${formatTime(position)} / ${formatTime(duration)}"
     }
+
+    private fun duplicateTrackIds(): Set<String> = tracks.groupBy {
+        titleOf(it).trim().lowercase(Locale.ROOT) + "|" + artistOf(it).trim().lowercase(Locale.ROOT)
+    }.filterValues { it.size > 1 }.values.flatten().map { it.id.toString() }.toSet()
 
     private fun recentTrackIds(): List<String> {
         return try {
