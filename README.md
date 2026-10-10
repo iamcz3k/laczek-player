@@ -1,24 +1,34 @@
 # LaCzek Player
 
-Offline-first Android music player. This initial test build scans music already stored on your phone and plays local audio. It has no streaming, accounts, cloud services, online lyrics, or online APIs.
+An offline-first Android music player. Playback and library management operate on local files. The app does not implement streaming, accounts, cloud services, online lyrics, or online metadata APIs.
 
-## Included in the initial test build
-- Scan local audio using Android MediaStore
-- Song list with title, artist, and duration
-- Local playback, play/pause, next/previous, and seek bar
+## Current test build features
+- Scan the device's local audio library
+- Browse songs, albums, artists, and folders
+- Search local songs and metadata
+- Local playback with play/pause, next/previous, seeking, shuffle, repeat, and a playback queue
+- Background playback through Android Media3 MediaSessionService, including system media controls
+- Local favourites and named playlists
+- Track details and sharing of local audio files
+- Built-in Android equalizer where supported
+- Load local LRC or text lyric files
+- Sleep timer, playback speed control, and seek by 15 seconds
 - Dark interface with LaCzek orange accents
-- Android audio permission handling
+- Local JSON settings backup and restore
+- Local preferences for favourites, playlists, theme, and sort mode
 
-## Download the APK
-1. Open the repository's Actions tab.
-2. Open the latest successful "Build LaCzek Player APK" run.
-3. Download the LACZEKPlayer-1.0.0-debug artifact ZIP.
-4. Extract it and install app-debug.apk on your Android phone.
+## Download the latest APK
+**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/app-debug.apk
 
-The artifact appears only after GitHub Actions finishes a successful build. This is a debug APK for testing, not a production-signed release.
+If a release asset is not available yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), select the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.1.0-debug** artifact ZIP.
+
+This is a debug build intended for testing, not a production-signed release. Android may require you to allow installation from the browser or file manager.
 
 ## Build
-Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run: gradle assembleDebug
+Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDebug`.
 
-Package: com.v3x.laczekplayer
-Version: 1.0.0 (initial test build)
+- Package: `com.v3x.laczekplayer`
+- Version: 1.1.0
+
+## Offline and capability notes
+The app does not need an internet connection for local playback. Equalizer support varies by device. Lyrics are read from files selected on the device; synchronized display requires timed lyric data and is still being developed. Some features from the long-term feature wishlist are not implemented yet.
