@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ComponentName
+import android.content.ContentValues
 import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -263,12 +264,14 @@ class MainActivity : Activity() {
         tools.addView(actionButton("Repeat") { cycleRepeat() })
         tools.addView(actionButton("Lyrics") { showLyrics() })
         tools.addView(actionButton("Speed") { setPlaybackSpeed() })
+        tools.addView(actionButton("A-B") { toggleABRepeat() })
         tools.addView(actionButton("Queue") { showQueue() })
         tools.addView(actionButton("EQ") { showEqualizer() })
         playerPanel.addView(tools)
         root.addView(playerPanel)
         setContentView(root)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
+        abTicker?.let { uiHandler.removeCallbacks(it) }
         uiTicker = object : Runnable {
             override fun run() {
                 updatePlaybackUi()
@@ -403,6 +406,11 @@ class MainActivity : Activity() {
     private var pendingExportPlaylist: String? = null
     private var pendingCopyTrack: Track? = null
     private var pendingArtworkTrack: Track? = null
+    private var pendingRenameTrack: Track? = null
+    private var pendingRenameName: String? = null
+    private var abStartMs: Long? = null
+    private var abEndMs: Long? = null
+    private var abTicker: Runnable? = null
 
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
@@ -476,7 +484,7 @@ class MainActivity : Activity() {
         val options = arrayOf(
             if (favorites.contains(track.id.toString())) "Remove favourite" else "Add to favourites",
             "Play next", "Add to queue", "Add to playlist", "Edit local tags", "Rate track",
-            "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Choose local artwork", "Reset local artwork", "Track details"
+            "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Rename file", "Choose local artwork", "Reset local artwork", "Track details"
         )
         AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
             when (which) {
@@ -491,9 +499,10 @@ class MainActivity : Activity() {
                 8 -> shareTrack(track)
                 9 -> { pendingCopyTrack = track; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/*"; putExtra(Intent.EXTRA_TITLE, fileNameOf(track)) }; startActivityForResult(intent, 208) }
                 10 -> deleteTrack(track)
-                11 -> chooseArtwork(track)
-                12 -> { customArtworkUris.remove(artworkKey(track)); saveLocalSettings(); updatePlaybackUi(); Toast.makeText(this, "Custom artwork removed", Toast.LENGTH_SHORT).show() }
-                13 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nGenre: ${track.genre}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                11 -> renameTrack(track)
+                12 -> chooseArtwork(track)
+                13 -> { customArtworkUris.remove(artworkKey(track)); saveLocalSettings(); updatePlaybackUi(); Toast.makeText(this, "Custom artwork removed", Toast.LENGTH_SHORT).show() }
+                14 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nGenre: ${track.genre}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
@@ -544,7 +553,7 @@ class MainActivity : Activity() {
             try {
                 controller = controllerFuture?.get()
                 controller?.addListener(object : Player.Listener {
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) = updatePlaybackUi()
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { abStartMs = null; abEndMs = null; abTicker?.let { uiHandler.removeCallbacks(it) }; abTicker = null; updatePlaybackUi() }
                     override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlaybackUi()
                     override fun onPlaybackStateChanged(playbackState: Int) = updatePlaybackUi()
                 })
@@ -629,6 +638,32 @@ class MainActivity : Activity() {
             val arr = JSONArray(getSharedPreferences("laczek_player", MODE_PRIVATE).getString("recent_order", "[]"))
             (0 until arr.length()).map { arr.optString(it) }
         } catch (_: Exception) { emptyList() }
+    }
+
+    private fun toggleABRepeat() {
+        val p = controller
+        if (p == null || p.mediaItemCount == 0) { Toast.makeText(this, "Play a track first", Toast.LENGTH_SHORT).show(); return }
+        when {
+            abStartMs == null -> { abStartMs = p.currentPosition; abEndMs = null; startABTicker(); Toast.makeText(this, "A point set. Tap A-B again at the end point.", Toast.LENGTH_SHORT).show() }
+            abEndMs == null -> {
+                val end = p.currentPosition
+                if (end <= (abStartMs ?: 0L) + 500L) Toast.makeText(this, "End point must be after start point", Toast.LENGTH_SHORT).show()
+                else { abEndMs = end; Toast.makeText(this, "A-B repeat active", Toast.LENGTH_SHORT).show() }
+            }
+            else -> { abStartMs = null; abEndMs = null; abTicker?.let { uiHandler.removeCallbacks(it) }; abTicker = null; Toast.makeText(this, "A-B repeat off", Toast.LENGTH_SHORT).show() }
+        }
+    }
+
+    private fun startABTicker() {
+        if (abTicker != null) return
+        abTicker = object : Runnable {
+            override fun run() {
+                val p = controller; val start = abStartMs; val end = abEndMs
+                if (p != null && start != null && end != null && p.currentPosition >= end) p.seekTo(start)
+                if (abStartMs != null) uiHandler.postDelayed(this, 100L) else abTicker = null
+            }
+        }
+        uiHandler.post(abTicker!!)
     }
 
     private fun setPlaybackSpeed() {
@@ -1005,6 +1040,9 @@ class MainActivity : Activity() {
             207 -> {
                 if (resultCode == RESULT_OK) { Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show(); scanLibrary() }
             }
+            210 -> {
+                if (resultCode == RESULT_OK) performRename() else { pendingRenameTrack = null; pendingRenameName = null }
+            }
             209 -> {
                 val uri = data.data
                 val track = pendingArtworkTrack
@@ -1080,6 +1118,32 @@ class MainActivity : Activity() {
                 controller?.setMediaItems(items); controller?.prepare(); controller?.play()
             }
         }
+    }
+
+    private fun renameTrack(track: Track) {
+        val input = EditText(this).apply { setText(fileNameOf(track)); setTextColor(fg) }
+        AlertDialog.Builder(this).setTitle("Rename local audio file").setMessage("This changes the filename, not the embedded song tags.")
+            .setView(input).setPositiveButton("Rename") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isBlank()) { Toast.makeText(this, "Filename cannot be empty", Toast.LENGTH_SHORT).show(); return@setPositiveButton }
+                pendingRenameTrack = track; pendingRenameName = newName
+                if (Build.VERSION.SDK_INT >= 30) {
+                    try { val request = MediaStore.createWriteRequest(contentResolver, listOf(track.uri)); startIntentSenderForResult(request.intentSender, 210, null, 0, 0, 0) }
+                    catch (_: Exception) { Toast.makeText(this, "Android could not request rename permission", Toast.LENGTH_LONG).show() }
+                } else performRename()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun performRename() {
+        val track = pendingRenameTrack ?: return
+        val name = pendingRenameName ?: return
+        try {
+            val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, name) }
+            val changed = contentResolver.update(track.uri, values, null, null)
+            if (changed > 0) Toast.makeText(this, "File renamed", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, "Android did not rename this file", Toast.LENGTH_LONG).show()
+        } catch (_: Exception) { Toast.makeText(this, "Rename permission was denied or this file cannot be renamed", Toast.LENGTH_LONG).show() }
+        pendingRenameTrack = null; pendingRenameName = null; scanLibrary()
     }
 
     private fun deleteTrack(track: Track) {
