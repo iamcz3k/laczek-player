@@ -737,7 +737,7 @@ class MainActivity : Activity() {
     }
 
     private fun showMoreMenu() {
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics")
         AlertDialog.Builder(this).setTitle("LaCzek tools").setItems(options) { _, which ->
             when (which) {
                 0 -> scanLibrary()
@@ -755,9 +755,30 @@ class MainActivity : Activity() {
                 12 -> manageHiddenFolders()
                 13 -> saveQueueForLater()
                 14 -> restoreSavedQueue()
+                15 -> showListeningStats()
             }
         }.show()
     }
+    private fun showListeningStats() {
+        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        val totalPlays = prefs.all.filterKeys { it.startsWith("plays_") }.values.sumOf { (it as? Int ?: 0).toLong() }
+        val totalListeningMs = prefs.getLong("listening_ms", 0L)
+        val libraryDuration = tracks.sumOf { it.duration }
+        val favouritesCount = favorites.size
+        val playlistCount = playlistMap.size
+        val ratedCount = ratings.size
+        val bookmarkCount = bookmarks.size
+        val message = "Listening time: ${formatLongDuration(totalListeningMs)}\nTracks scanned: ${tracks.size}\nLibrary duration: ${formatLongDuration(libraryDuration)}\nTracked starts: $totalPlays\nFavourites: $favouritesCount\nPlaylists: $playlistCount\nRated tracks: $ratedCount\nBookmarks: $bookmarkCount"
+        AlertDialog.Builder(this).setTitle("Offline listening statistics").setMessage(message).setPositiveButton("Close", null).show()
+    }
+
+    private fun formatLongDuration(ms: Long): String {
+        val seconds = ms.coerceAtLeast(0L) / 1000L
+        val hours = seconds / 3600L
+        val minutes = (seconds % 3600L) / 60L
+        return "${hours}h ${minutes}m"
+    }
+
     private fun chooseAccentColour() {
         val names = arrayOf("LaCzek orange", "Cyan", "Purple", "Green", "Pink", "Blue", "White")
         val colours = intArrayOf(Color.rgb(255, 138, 61), Color.rgb(0, 210, 220), Color.rgb(174, 106, 255), Color.rgb(68, 205, 120), Color.rgb(255, 90, 160), Color.rgb(75, 145, 255), Color.WHITE)
