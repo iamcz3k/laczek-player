@@ -739,6 +739,49 @@ class MainActivity : Activity() {
                     } catch (_: Exception) { Toast.makeText(this, "Could not restore this backup", Toast.LENGTH_SHORT).show() }
                 }
             }
+            205 -> {
+                val name = pendingExportPlaylist
+                val ids = if (name != null) playlistMap[name] ?: emptySet() else emptySet()
+                data.data?.let { uri ->
+                    try {
+                        val body = buildString {
+                            append("#EXTM3U\n")
+                            tracks.filter { it.id.toString() in ids }.forEach { t ->
+                                append("#EXTINF:").append(t.duration / 1000).append(",").append(titleOf(t)).append("\n")
+                                append(t.uri.toString()).append("\n")
+                            }
+                        }
+                        contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) }
+                        Toast.makeText(this, "Playlist exported as M3U", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { Toast.makeText(this, "Could not export playlist", Toast.LENGTH_SHORT).show() }
+                }
+                pendingExportPlaylist = null
+            }
+            206 -> {
+                data.data?.let { uri ->
+                    try {
+                        val body = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                        val imported = mutableSetOf<String>()
+                        var lastTitle = ""
+                        body.lineSequence().forEach { line ->
+                            when {
+                                line.startsWith("#EXTINF:", true) -> lastTitle = line.substringAfter(",").trim()
+                                line.isNotBlank() && !line.startsWith("#") -> {
+                                    val parsed = Uri.parse(line)
+                                    val id = parsed.lastPathSegment
+                                    val match = tracks.firstOrNull { it.id.toString() == id } ?: tracks.firstOrNull { titleOf(it).equals(lastTitle, true) || it.title.equals(lastTitle, true) }
+                                    if (match != null) imported.add(match.id.toString())
+                                    lastTitle = ""
+                                }
+                            }
+                        }
+                        val name = "Imported playlist " + (playlistMap.size + 1)
+                        playlistMap[name] = imported
+                        saveLocalSettings(); section = "Playlists"; currentPlaylist = null; renderLibrary()
+                        Toast.makeText(this, "Imported ${imported.size} matching local tracks", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) { Toast.makeText(this, "Could not import this M3U file", Toast.LENGTH_SHORT).show() }
+                }
+            }
             202 -> {
                 val uris = mutableListOf<Uri>()
                 data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
