@@ -38,6 +38,11 @@ class MainActivity : Activity() {
     private val tracks = mutableListOf<Track>()
     private val favorites = mutableSetOf<String>()
     private val playlistMap = linkedMapOf<String, MutableSet<String>>()
+    private val ratings = mutableMapOf<String, Int>()
+    private val bookmarks = mutableMapOf<String, Long>()
+    private val customTitles = mutableMapOf<String, String>()
+    private val customArtists = mutableMapOf<String, String>()
+    private val customAlbums = mutableMapOf<String, String>()
     private var section = "Songs"
     private var query = ""
     private var sortMode = "Title"
@@ -78,6 +83,11 @@ class MainActivity : Activity() {
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
         dark = prefs.getBoolean("dark", true)
         sortMode = prefs.getString("sort", "Title") ?: "Title"
+        readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
+        readStringMap(prefs.getString("custom_artists", "{}"), customArtists)
+        readStringMap(prefs.getString("custom_albums", "{}"), customAlbums)
+        readLongMap(prefs.getString("bookmarks", "{}"), bookmarks)
+        readIntMap(prefs.getString("ratings", "{}"), ratings)
         try {
             val json = JSONArray(prefs.getString("playlists", "[]"))
             for (i in 0 until json.length()) {
@@ -104,8 +114,39 @@ class MainActivity : Activity() {
             .putString("playlists", json.toString())
             .putBoolean("dark", dark)
             .putString("sort", sortMode)
+            .putString("custom_titles", JSONObject(customTitles as Map<*, *>).toString())
+            .putString("custom_artists", JSONObject(customArtists as Map<*, *>).toString())
+            .putString("custom_albums", JSONObject(customAlbums as Map<*, *>).toString())
+            .putString("bookmarks", JSONObject(bookmarks as Map<*, *>).toString())
+            .putString("ratings", JSONObject(ratings as Map<*, *>).toString())
             .apply()
     }
+
+    private fun readStringMap(json: String?, target: MutableMap<String, String>) {
+        try {
+            val obj = JSONObject(json ?: "{}")
+            val keys = obj.keys()
+            while (keys.hasNext()) { val key = keys.next(); target[key] = obj.optString(key) }
+        } catch (_: Exception) {}
+    }
+    private fun readLongMap(json: String?, target: MutableMap<String, Long>) {
+        try {
+            val obj = JSONObject(json ?: "{}")
+            val keys = obj.keys()
+            while (keys.hasNext()) { val key = keys.next(); target[key] = obj.optLong(key) }
+        } catch (_: Exception) {}
+    }
+    private fun readIntMap(json: String?, target: MutableMap<String, Int>) {
+        try {
+            val obj = JSONObject(json ?: "{}")
+            val keys = obj.keys()
+            while (keys.hasNext()) { val key = keys.next(); target[key] = obj.optInt(key) }
+        } catch (_: Exception) {}
+    }
+
+    private fun titleOf(t: Track) = customTitles[t.id.toString()] ?: t.title
+    private fun artistOf(t: Track) = customArtists[t.id.toString()] ?: t.artist
+    private fun albumOf(t: Track) = customAlbums[t.id.toString()] ?: t.album
 
     private fun buildUi() {
         root = LinearLayout(this).apply {
