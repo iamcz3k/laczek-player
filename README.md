@@ -13,6 +13,7 @@ An offline-first Android music player. Playback, library management, playlists, 
 - App-local title/artist/album overrides, star ratings, and per-track playback bookmarks
 - Equalizer presets, custom band controls, bass boost, and virtualizer where supported
 - A-B repeat for looping a section of a track; rename files through Android's media permission flow
+- Offline listening-time and library statistics
 - Local LRC/TXT lyrics; timestamped LRC lines follow playback position
 - Sleep timer, stop after current track, fade-out timer, and ±15-second seeking
 - Share/copy local audio files and request Android consent before deleting supported media files
@@ -24,7 +25,7 @@ An offline-first Android music player. Playback, library management, playlists, 
 ## Download the latest APK
 **Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/app-debug.apk
 
-If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.5.0-debug** artifact ZIP.
+If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.6.0-debug** artifact ZIP.
 
 This is a debug APK for testing, not a production-signed release. Android may ask you to allow installation from the browser or file manager.
 
@@ -32,7 +33,7 @@ This is a debug APK for testing, not a production-signed release. Android may as
 Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDebug`.
 
 - Package: `com.v3x.laczekplayer`
-- Version: 1.5.0
+- Version: 1.6.0
 
 ## Important limits
 This remains an evolving test build, not every item from the original 150+ feature wishlist is implemented. Hardware-dependent effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. M3U imports match local tracks by media ID or title; external playlist paths may not map on a different device.
