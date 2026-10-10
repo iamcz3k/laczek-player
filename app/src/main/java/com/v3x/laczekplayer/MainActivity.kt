@@ -493,7 +493,7 @@ class MainActivity : Activity() {
                 10 -> deleteTrack(track)
                 11 -> chooseArtwork(track)
                 12 -> { customArtworkUris.remove(artworkKey(track)); saveLocalSettings(); updatePlaybackUi(); Toast.makeText(this, "Custom artwork removed", Toast.LENGTH_SHORT).show() }
-                13 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
+                13 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nGenre: ${track.genre}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
         }.show()
     }
