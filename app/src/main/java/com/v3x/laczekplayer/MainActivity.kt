@@ -931,6 +931,7 @@ class MainActivity : Activity() {
                             .put("custom_titles", JSONObject(customTitles as Map<*, *>))
                             .put("custom_artists", JSONObject(customArtists as Map<*, *>))
                             .put("custom_albums", JSONObject(customAlbums as Map<*, *>))
+                            .put("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>))
                             .put("bookmarks", JSONObject(bookmarks as Map<*, *>))
                             .put("ratings", JSONObject(ratings as Map<*, *>))
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(backup.toString(2)) }
@@ -951,6 +952,7 @@ class MainActivity : Activity() {
                         customTitles.clear(); readStringMap(backup.optString("custom_titles", "{}"), customTitles)
                         customArtists.clear(); readStringMap(backup.optString("custom_artists", "{}"), customArtists)
                         customAlbums.clear(); readStringMap(backup.optString("custom_albums", "{}"), customAlbums)
+                        customArtworkUris.clear(); readStringMap(backup.optString("custom_artwork_uris", "{}"), customArtworkUris)
                         bookmarks.clear(); readLongMap(backup.optString("bookmarks", "{}"), bookmarks)
                         ratings.clear(); readIntMap(backup.optString("ratings", "{}"), ratings)
                         playlistMap.clear()
@@ -970,6 +972,17 @@ class MainActivity : Activity() {
             }
             207 -> {
                 if (resultCode == RESULT_OK) { Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show(); scanLibrary() }
+            }
+            209 -> {
+                val uri = data.data
+                val track = pendingArtworkTrack
+                if (uri != null && track != null) {
+                    try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                    customArtworkUris[artworkKey(track)] = uri.toString()
+                    saveLocalSettings(); updatePlaybackUi()
+                    Toast.makeText(this, "Artwork saved locally", Toast.LENGTH_SHORT).show()
+                }
+                pendingArtworkTrack = null
             }
             208 -> {
                 val target = data.data
