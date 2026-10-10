@@ -13,7 +13,7 @@ An offline-first Android music player. Playback, library management, playlists, 
 - App-local title/artist/album overrides, star ratings, and per-track playback bookmarks
 - Equalizer presets, custom band controls, bass boost, and virtualizer where supported
 - A-B repeat for looping a section of a track; rename files through Android's media permission flow
-- Offline listening-time and library statistics
+- Offline listening-time and library statistics (time is counted while background playback is active)
 - Local LRC/TXT lyrics; timestamped LRC lines follow playback position
 - Sleep timer, stop after current track, fade-out timer, and ±15-second seeking
 - Share/copy local audio files and request Android consent before deleting supported media files
