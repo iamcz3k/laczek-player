@@ -65,12 +65,12 @@ jobs:
           body: |
             LaCzek Player v2.0.0 redesigned offline test build.
 
-            - Branded launcher icon and adaptive icon support.
-            - Queue item management: play now, move up/down, remove.
-            - Resume last track from saved playback position.
-            - Offline-only APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
-
-            This is a debug APK for testing; the full feature wishlist is still in progress.
+            - Modernized dark interface with orange accents and rounded navigation.
+            - Refreshed mini-player controls and artwork-aware library rows.
+            - Track actions remain accessible from the library.
+            - Existing offline playback and library tools retained.
+            - APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
+            - Debug APK for device testing.
           fail_on_unmatched_files: true
       - name: Publish build status on commit
         if: always()
