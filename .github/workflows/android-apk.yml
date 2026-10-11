@@ -46,36 +46,37 @@ jobs:
             echo "Offline-only APK must not request INTERNET permission (including merged manifest)" >&2
             exit 1
           fi
-          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.3.0.apk
+          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.4.0.apk
       - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LACZEKPlayer-2.3.0-debug
-          path: app/build/outputs/apk/debug/LACZEKPlayer-2.3.0.apk
+          name: LACZEKPlayer-2.4.0-debug
+          path: app/build/outputs/apk/debug/LACZEKPlayer-2.4.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Publish easy-download GitHub Release APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3.0
-          name: LaCzek Player v2.3.0
+          tag_name: v2.4.0
+          name: LaCzek Player v2.4.0
           make_latest: true
-          files: app/build/outputs/apk/debug/LACZEKPlayer-2.3.0.apk
+          files: app/build/outputs/apk/debug/LACZEKPlayer-2.4.0.apk
           overwrite_files: true
           body: |
-            LaCzek Player v2.3.0 — ten selected offline features.
+            LaCzek Player v2.4.0 — ten selected Namida-inspired offline features.
 
-            - Local synced LRC lyrics editor with per-track saving and import.
-            - Home-screen playback widget with play/pause, next, and favorite toggle.
-            - Artwork-sampled accent colors and smoother button/screen animations.
-            - Optional two-player audio crossfade, controlled locally through player tools.
-            - Multi-select songs to queue, favorite, or save as a playlist.
-            - Local metadata overrides for title, artist, album, genre, and year.
-            - Advanced offline search by artist, year, format, and duration.
-            - Quick resume banner for the last saved track position.
-            - Playback speed remembered separately for each track.
-            - Smart library views and existing offline playback tools retained.
-            - APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
+            - Minimum file size and duration filters, stored locally and applied to library views.
+            - Expanded offline sorting by year, file size, rating, play count, format and duration.
+            - Search local saved lyrics along with track metadata.
+            - Extract featured artists from local artist metadata and browse them separately.
+            - Read folder cover.jpg/cover.png and .info.txt after the user grants local folder access.
+            - Manually reorder playlist tracks and assign local playlist artwork.
+            - Preserve multi-selection across library sections and select whole groups.
+            - Media3 native skip-silence playback with a local toggle.
+            - Smooth fade effects around play, pause and track skip.
+            - Optional mini-player breathing-edge party animation.
+            - Local backup/restore includes new playlist artwork and library filter settings.
+            - No internet permission. APK verification checks package ID, archive integrity, debug signature, launcher icon, and offline-only permissions.
             - Debug APK for device testing.
           fail_on_unmatched_files: true
       - name: Publish build status on commit
