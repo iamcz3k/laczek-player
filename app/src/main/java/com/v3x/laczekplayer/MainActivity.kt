@@ -489,7 +489,7 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
             when (which) {
                 0 -> { if (!favorites.add(track.id.toString())) favorites.remove(track.id.toString()); saveLocalSettings(); renderLibrary() }
-                1 -> controller?.let { it.addMediaItem(0, mediaItem(track)); Toast.makeText(this, "Queued next", Toast.LENGTH_SHORT).show() }
+                1 -> controller?.let { val insertAt = (it.currentMediaItemIndex + 1).coerceIn(0, it.mediaItemCount); it.addMediaItem(insertAt, mediaItem(track)); Toast.makeText(this, "Queued next", Toast.LENGTH_SHORT).show() }
                 2 -> { controller?.addMediaItem(mediaItem(track)); Toast.makeText(this, "Added to queue", Toast.LENGTH_SHORT).show() }
                 3 -> addTrackToPlaylist(track)
                 4 -> editLocalTags(track)
