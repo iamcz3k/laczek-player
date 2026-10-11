@@ -22,7 +22,7 @@ An offline-first Android music player. Playback, library management, playlists, 
 - Local JSON backup/restore for favourites, playlists, theme, sort mode, tags, artwork overrides, ratings, and bookmarks
 - Branded LaCzek Player launcher icon with an adaptive icon on Android 8.0+;
 - Playback queue item controls: play now, move up/down, or remove without clearing the whole queue;
-- Export the currently filtered library to CSV for offline spreadsheets; resume the last played local track; clear listening history and counters with confirmation
+- Export the currently filtered library to CSV for offline spreadsheets; resume the last played local track from its last saved position; clear listening history and counters with confirmation
 - No network permission requested by the app
 
 ## Download the latest APK
