@@ -51,7 +51,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LACZEKPlayer-2.3.0-debug
-          path: app/build/outputs/apk/debug/LACZEKPlayer-2.2.0.apk
+          path: app/build/outputs/apk/debug/LACZEKPlayer-2.3.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Publish easy-download GitHub Release APK
@@ -60,15 +60,21 @@ jobs:
           tag_name: v2.3.0
           name: LaCzek Player v2.3.0
           make_latest: true
-          files: app/build/outputs/apk/debug/LACZEKPlayer-2.2.0.apk
+          files: app/build/outputs/apk/debug/LACZEKPlayer-2.3.0.apk
           overwrite_files: true
           body: |
-            LaCzek Player v2.2.0 — smart offline library update.
+            LaCzek Player v2.3.0 — ten selected offline features.
 
-            - Adds Recently added, Unplayed, Top rated, Longest, Shortest, and Large files library views.
-            - Smart views are calculated locally from the device library, play counts, ratings, duration, and file size.
-            - Retains the immersive Now Playing screen and custom LaCzek menus.
-            - Offline playback and local library tools retained.
+            - Local synced LRC lyrics editor with per-track saving and import.
+            - Home-screen playback widget with play/pause, next, and favorite toggle.
+            - Artwork-sampled accent colors and smoother button/screen animations.
+            - Optional two-player audio crossfade, controlled locally through player tools.
+            - Multi-select songs to queue, favorite, or save as a playlist.
+            - Local metadata overrides for title, artist, album, genre, and year.
+            - Advanced offline search by artist, year, format, and duration.
+            - Quick resume banner for the last saved track position.
+            - Playback speed remembered separately for each track.
+            - Smart library views and existing offline playback tools retained.
             - APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
             - Debug APK for device testing.
           fail_on_unmatched_files: true
