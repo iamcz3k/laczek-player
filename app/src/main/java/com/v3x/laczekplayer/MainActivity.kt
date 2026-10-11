@@ -275,6 +275,7 @@ class MainActivity : Activity() {
         uiTicker = object : Runnable {
             override fun run() {
                 updatePlaybackUi()
+                persistPlaybackPosition()
                 uiHandler.postDelayed(this, 700L)
             }
         }
@@ -411,6 +412,7 @@ class MainActivity : Activity() {
     private var abStartMs: Long? = null
     private var abEndMs: Long? = null
     private var abTicker: Runnable? = null
+    private var lastPositionSavedAtMs = 0L
 
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
@@ -564,11 +566,11 @@ class MainActivity : Activity() {
         }, mainExecutor)
     }
 
-    private fun playTrack(track: Track) {
+    private fun playTrack(track: Track, startPositionMs: Long = 0L) {
         val p = controller ?: run { Toast.makeText(this, "Player is still starting. Try again.", Toast.LENGTH_SHORT).show(); return }
         val ordered = filteredTracks()
         val list = (listOf(track) + ordered.filter { it.id != track.id }).distinctBy { it.id }
-        p.setMediaItems(list.map { mediaItem(it) }, 0, 0L)
+        p.setMediaItems(list.map { mediaItem(it) }, 0, startPositionMs.coerceAtLeast(0L))
         p.prepare()
         p.play()
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
@@ -606,6 +608,19 @@ class MainActivity : Activity() {
             Toast.makeText(this, when (it.repeatMode) { Player.REPEAT_MODE_ALL -> "Repeat all"; Player.REPEAT_MODE_ONE -> "Repeat one"; else -> "Repeat off" }, Toast.LENGTH_SHORT).show()
         }
     }
+    private fun persistPlaybackPosition(force: Boolean = false) {
+        val p = controller ?: return
+        val item = p.currentMediaItem ?: return
+        val id = item.mediaId.toLongOrNull() ?: return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastPositionSavedAtMs < 5_000L) return
+        lastPositionSavedAtMs = now
+        getSharedPreferences("laczek_player", MODE_PRIVATE).edit()
+            .putLong("last_track", id)
+            .putLong("last_position_ms", p.currentPosition.coerceAtLeast(0L))
+            .apply()
+    }
+
     private fun updatePlaybackUi() {
         if (!::nowPlaying.isInitialized) return
         val p = controller
@@ -809,13 +824,14 @@ class MainActivity : Activity() {
     }
 
     private fun resumeLastTrack() {
-        val lastId = getSharedPreferences("laczek_player", MODE_PRIVATE).getLong("last_track", -1L)
+        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        val lastId = prefs.getLong("last_track", -1L)
         val track = tracks.firstOrNull { it.id == lastId }
         if (track == null) {
             Toast.makeText(this, "No saved last track. Play a song first.", Toast.LENGTH_SHORT).show()
             return
         }
-        playTrack(track)
+        playTrack(track, prefs.getLong("last_position_ms", 0L).coerceAtLeast(0L))
     }
 
     private fun exportLibraryIndex() {
@@ -1344,7 +1360,13 @@ class MainActivity : Activity() {
     private fun formatTime(ms: Long): String = String.format(Locale.ROOT, "%d:%02d", ms.coerceAtLeast(0) / 60000, (ms.coerceAtLeast(0) / 1000) % 60)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    override fun onPause() {
+        persistPlaybackPosition(force = true)
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        persistPlaybackPosition(force = true)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
         equalizer?.release()
         bassBoost?.release()
