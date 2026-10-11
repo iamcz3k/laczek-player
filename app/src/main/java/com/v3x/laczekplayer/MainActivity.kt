@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.View
@@ -1129,6 +1130,53 @@ class MainActivity : Activity() {
     private fun artworkKey(t: Track): String = if (t.albumId > 0) "album:" + t.albumId else "track:" + t.id
     private fun artworkUri(t: Track): Uri? = customArtworkUris[artworkKey(t)]?.let { Uri.parse(it) }
         ?: if (t.albumId > 0) Uri.parse("content://media/external/audio/albumart/" + t.albumId) else null
+
+    private fun chooseFolderAssets(path: String) {
+        pendingFolderPath = path
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 212)
+    }
+
+    private fun folderDocument(folderPath: String, fileName: String): Uri? {
+        val tree = folderTreeUris[folderPath]?.let { Uri.parse(it) } ?: return null
+        return try {
+            val treeId = DocumentsContract.getTreeDocumentId(tree)
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, treeId)
+            contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameCol).equals(fileName, true)) return DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(idCol))
+                }
+            }
+            null
+        } catch (_: Exception) { null }
+    }
+
+    private fun showFolderInfo(path: String, group: List<Track>) {
+        val infoUri = folderDocument(path, ".info.txt")
+        val info = if (infoUri != null) try { contentResolver.openInputStream(infoUri)?.bufferedReader()?.use { it.readText().take(6000) } ?: "" } catch (_: Exception) { "" } else ""
+        val cover = folderDocument(path, "cover.jpg") ?: folderDocument(path, "cover.png")
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(8), dp(12), dp(8)) }
+        if (cover != null) body.addView(ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setImageURI(cover) }, LinearLayout.LayoutParams(dp(112), dp(112)).apply { gravity = Gravity.CENTER; bottomMargin = dp(10) })
+        body.addView(TextView(this).apply { text = info.ifBlank { "No .info.txt found. Long-press this folder to grant access to its files." }; setTextColor(fg); textSize = 14f })
+        AlertDialog.Builder(this).setTitle(path.trimEnd('/').substringAfterLast('/').ifBlank { path }).setView(body)
+            .setPositiveButton("Play folder") { _, _ -> playTracks(group) }
+            .setNeutralButton(if (folderTreeUris.containsKey(path)) "Change folder access" else "Use folder artwork/info") { _, _ -> chooseFolderAssets(path) }
+            .setNegativeButton("Close", null).show()
+    }
+
+    private fun applyMiniPartyMode() {
+        val view = miniPlayerPanel ?: return
+        partyAnimator?.cancel(); partyAnimator = null
+        val enabled = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("mini_party_mode", false)
+        if (!enabled) { view.background = roundedBackground(panel, dp(20)); return }
+        val outline = GradientDrawable().apply { shape = GradientDrawable.RECTANGLE; cornerRadius = dp(20).toFloat(); setColor(panel); setStroke(dp(2), orange) }
+        view.background = outline
+        partyAnimator = ValueAnimator.ofObject(ArgbEvaluator(), orange, Color.TRANSPARENT).apply {
+            duration = 1100L; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { outline.setStroke(dp(2), it.animatedValue as Int) }; start()
+        }
+    }
 
     private fun chooseArtwork(track: Track) {
         pendingArtworkTrack = track
