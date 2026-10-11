@@ -1497,7 +1497,9 @@ class MainActivity : Activity() {
     private fun showMoreMenu() {
         val crossfade = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("crossfade_enabled", false)
         val artworkColors = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("artwork_colors", true)
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select")
+        val skipSilence = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("skip_silence_enabled", false)
+        val partyMode = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("mini_party_mode", false)
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
         showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
             when (which) {
                 0 -> scanLibrary()
@@ -1522,6 +1524,9 @@ class MainActivity : Activity() {
                 19 -> { val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE); prefs.edit().putBoolean("crossfade_enabled", !crossfade).apply(); Toast.makeText(this, "Crossfade ${if (!crossfade) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show() }
                 20 -> { val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE); prefs.edit().putBoolean("artwork_colors", !artworkColors).apply(); lastAccentTrackId = ""; if (artworkColors) accentColor = Color.rgb(255, 138, 61) else controller?.currentMediaItem?.mediaId?.let { id -> tracks.firstOrNull { it.id.toString() == id }?.let { updateArtworkAccent(it) } }; rebuildUi() }
                 21 -> { selectionMode = !selectionMode; if (selectionMode) section = "Songs" else selectedTrackIds.clear(); rebuildUi() }
+                22 -> chooseLibraryLimits()
+                23 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().putBoolean("skip_silence_enabled", !skipSilence).apply(); Toast.makeText(this, "Skip silence "+(if (!skipSilence) "enabled" else "disabled"), Toast.LENGTH_SHORT).show() }
+                24 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().putBoolean("mini_party_mode", !partyMode).apply(); applyMiniPartyMode() }
             }
         }
     }
