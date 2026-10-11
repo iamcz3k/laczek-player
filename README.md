@@ -20,12 +20,13 @@ An offline-first Android music player. Playback, library management, playlists, 
 - File details including composer, year, format, size, and duration when indexed by Android
 - Dark/light appearance, customizable accent colour, and folder exclusions
 - Local JSON backup/restore for favourites, playlists, theme, sort mode, tags, artwork overrides, ratings, and bookmarks
+- Export the currently filtered library to CSV for offline spreadsheets; resume the last played local track; clear listening history and counters with confirmation
 - No network permission requested by the app
 
 ## Download the latest APK
-**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/LACZEKPlayer-1.7.0.apk
+**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/LACZEKPlayer-1.8.0.apk
 
-If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.7.0-debug** artifact ZIP.
+If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.8.0-debug** artifact ZIP.
 
 This is a debug APK for testing, not a production-signed release. Android may ask you to allow installation from the browser or file manager.
 
@@ -33,7 +34,7 @@ This is a debug APK for testing, not a production-signed release. Android may as
 Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDebug`.
 
 - Package: `com.v3x.laczekplayer`
-- Version: 1.7.0
+- Version: 1.8.0
 
 ## Important limits
-This remains an evolving test build, not every item from the original 150+ feature wishlist is implemented. CI now checks APK archive integrity, debug signing, package ID, and absence of the Android INTERNET permission before publishing. Hardware-dependent effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. M3U imports match local tracks by media ID or title; external playlist paths may not map on a different device. JSON backup version 2 also preserves accent colour, hidden folders, recent order, play counts, listening time, and saved queue state.
+This remains an evolving test build, not every item from the original 150+ feature wishlist is implemented. The current build adds filtered-library CSV export, resume-last-track, and a complete listening-history reset. CI now checks APK archive integrity, debug signing, package ID, and absence of the Android INTERNET permission before publishing. Hardware-dependent effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. M3U imports match local tracks by media ID or title; external playlist paths may not map on a different device. JSON backup version 2 also preserves accent colour, hidden folders, recent order, play counts, listening time, and saved queue state.
