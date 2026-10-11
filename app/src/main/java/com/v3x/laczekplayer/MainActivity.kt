@@ -851,7 +851,11 @@ class MainActivity : Activity() {
             }
             groups.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (name, group) ->
                 val row = listRow(name, "${group.size} tracks · ${group.firstOrNull()?.artist ?: ""}") {
-                    if (section == "Folders") showFolderInfo(name, group) else showTrackGroup(name, group)
+                    if (selectionMode) {
+                        val ids = group.map { it.id.toString() }
+                        if (ids.all { it in selectedTrackIds }) selectedTrackIds.removeAll(ids.toSet()) else selectedTrackIds.addAll(ids)
+                        renderLibrary()
+                    } else if (section == "Folders") showFolderInfo(name, group) else showTrackGroup(name, group)
                 }
                 if (section == "Folders") row.setOnLongClickListener { chooseFolderAssets(name); true }
                 songList.addView(row)
@@ -861,6 +865,13 @@ class MainActivity : Activity() {
                 val row = listRow(name, "${ids.size} tracks · long-press for options") {
                     currentPlaylist = name
                     renderLibrary()
+                }
+                playlistArtworkUris[name]?.let { artUri ->
+                    try {
+                        val cover = row.getChildAt(0) as? FrameLayout
+                        cover?.removeAllViews()
+                        cover?.addView(ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setImageURI(Uri.parse(artUri)) }, FrameLayout.LayoutParams(-1, -1))
+                    } catch (_: Exception) {}
                 }
                 row.setOnLongClickListener { managePlaylist(name); true }
                 songList.addView(row)
