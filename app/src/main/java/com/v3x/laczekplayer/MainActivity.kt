@@ -1298,16 +1298,47 @@ class MainActivity : Activity() {
         recordTrackStarted(items.first())
         showFullPlayer()
     }
+    private fun runFadedAction(fadeInAfter: Boolean = true, action: () -> Unit) {
+        val p = controller ?: return
+        val handler = Handler(Looper.getMainLooper())
+        val originalVolume = p.volume.coerceIn(0f, 1f)
+        var step = 0
+        val fadeOut = object : Runnable {
+            override fun run() {
+                step++
+                p.volume = originalVolume * (1f - step / 4f).coerceAtLeast(0f)
+                if (step < 4) handler.postDelayed(this, 35L) else {
+                    action()
+                    if (!fadeInAfter) { p.volume = originalVolume; return }
+                    var up = 0
+                    val fadeIn = object : Runnable {
+                        override fun run() {
+                            up++
+                            p.volume = originalVolume * (up / 4f).coerceAtMost(1f)
+                            if (up < 4) handler.postDelayed(this, 35L)
+                        }
+                    }
+                    fadeIn.run()
+                }
+            }
+        }
+        fadeOut.run()
+    }
+
     private fun togglePlayback() {
         val p = controller ?: return
-        if (p.isPlaying) p.pause() else if (p.mediaItemCount > 0) p.play() else tracks.firstOrNull()?.let { playTrack(it) }
+        if (p.isPlaying) runFadedAction(false) { p.pause() }
+        else if (p.mediaItemCount > 0) runFadedAction(true) { p.play() }
+        else tracks.firstOrNull()?.let { playTrack(it) }
         updatePlaybackUi()
     }
     private fun skip(direction: Int) {
         val p = controller ?: return
-        if (direction < 0) {
-            if (p.currentPosition > 3000) p.seekTo(0) else p.seekToPreviousMediaItem()
-        } else p.seekToNextMediaItem()
+        runFadedAction(true) {
+            if (direction < 0) {
+                if (p.currentPosition > 3000) p.seekTo(0) else p.seekToPreviousMediaItem()
+            } else p.seekToNextMediaItem()
+        }
         updatePlaybackUi()
     }
     private fun toggleShuffle() {
