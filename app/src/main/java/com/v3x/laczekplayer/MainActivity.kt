@@ -62,6 +62,7 @@ class MainActivity : Activity() {
     private val customArtworkUris = mutableMapOf<String, String>()
     private val playlistArtworkUris = mutableMapOf<String, String>()
     private val folderTreeUris = mutableMapOf<String, String>()
+    private val folderDocumentCache = mutableMapOf<String, Uri?>()
     private var minFileSizeKb = 0L
     private var minDurationSeconds = 0L
     private var pendingFolderPath: String? = null
@@ -1166,19 +1167,27 @@ class MainActivity : Activity() {
     }
 
     private fun folderDocument(folderPath: String, fileName: String): Uri? {
+        val cacheKey = folderPath + "|" + fileName.lowercase(Locale.ROOT)
+        if (folderDocumentCache.containsKey(cacheKey)) return folderDocumentCache[cacheKey]
         val tree = folderTreeUris[folderPath]?.let { Uri.parse(it) } ?: return null
-        return try {
+        val found = try {
             val treeId = DocumentsContract.getTreeDocumentId(tree)
             val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, treeId)
+            var match: Uri? = null
             contentResolver.query(children, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { cursor ->
                 val idCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
                 val nameCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                 while (cursor.moveToNext()) {
-                    if (cursor.getString(nameCol).equals(fileName, true)) return DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(idCol))
+                    if (cursor.getString(nameCol).equals(fileName, true)) {
+                        match = DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(idCol))
+                        break
+                    }
                 }
             }
-            null
+            match
         } catch (_: Exception) { null }
+        folderDocumentCache[cacheKey] = found
+        return found
     }
 
     private fun showFolderInfo(path: String, group: List<Track>) {
@@ -2042,7 +2051,7 @@ class MainActivity : Activity() {
                 val path = pendingFolderPath
                 if (uri != null && path != null) {
                     try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
-                    folderTreeUris[path] = uri.toString(); saveLocalSettings()
+                    folderTreeUris[path] = uri.toString(); folderDocumentCache.keys.removeAll { it.startsWith(path + "|") }; saveLocalSettings()
                     Toast.makeText(this, "Folder artwork/info access saved", Toast.LENGTH_SHORT).show()
                     showFolderInfo(path, tracks.filter { it.path == path })
                 }
