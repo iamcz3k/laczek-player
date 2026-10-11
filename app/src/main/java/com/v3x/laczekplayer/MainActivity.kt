@@ -839,7 +839,11 @@ class MainActivity : Activity() {
                 else -> visible.groupBy { it.path }
             }
             groups.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (name, group) ->
-                songList.addView(listRow(name, "${group.size} tracks · ${group.firstOrNull()?.artist ?: ""}") { showTrackGroup(name, group) })
+                val row = listRow(name, "${group.size} tracks · ${group.firstOrNull()?.artist ?: ""}") {
+                    if (section == "Folders") showFolderInfo(name, group) else showTrackGroup(name, group)
+                }
+                if (section == "Folders") row.setOnLongClickListener { chooseFolderAssets(name); true }
+                songList.addView(row)
             }
         } else if (section == "Playlists" && currentPlaylist == null) {
             playlistMap.forEach { (name, ids) ->
@@ -1129,6 +1133,8 @@ class MainActivity : Activity() {
 
     private fun artworkKey(t: Track): String = if (t.albumId > 0) "album:" + t.albumId else "track:" + t.id
     private fun artworkUri(t: Track): Uri? = customArtworkUris[artworkKey(t)]?.let { Uri.parse(it) }
+        ?: folderDocument(t.path, "cover.jpg")
+        ?: folderDocument(t.path, "cover.png")
         ?: if (t.albumId > 0) Uri.parse("content://media/external/audio/albumart/" + t.albumId) else null
 
     private fun chooseFolderAssets(path: String) {
@@ -1321,6 +1327,7 @@ class MainActivity : Activity() {
         }
         val currentId = item?.mediaId ?: ""
         if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
+        applyMiniPartyMode()
         val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
         val widgetPlaying = p?.isPlaying == true
@@ -1942,6 +1949,27 @@ class MainActivity : Activity() {
             }
             210 -> {
                 if (resultCode == RESULT_OK) performRename() else { pendingRenameTrack = null; pendingRenameName = null }
+            }
+            212 -> {
+                val uri = data.data
+                val path = pendingFolderPath
+                if (uri != null && path != null) {
+                    try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                    folderTreeUris[path] = uri.toString(); saveLocalSettings()
+                    Toast.makeText(this, "Folder artwork/info access saved", Toast.LENGTH_SHORT).show()
+                    showFolderInfo(path, tracks.filter { it.path == path })
+                }
+                pendingFolderPath = null
+            }
+            213 -> {
+                val uri = data.data
+                val target = playlistArtworkTarget
+                if (uri != null && target != null) {
+                    try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                    playlistArtworkUris[target] = uri.toString(); saveLocalSettings(); renderLibrary()
+                    Toast.makeText(this, "Playlist artwork saved locally", Toast.LENGTH_SHORT).show()
+                }
+                playlistArtworkTarget = null
             }
             209 -> {
                 val uri = data.data
