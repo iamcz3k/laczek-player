@@ -463,7 +463,8 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(12))
         }
         listOf("Songs", "Albums", "Artists", "Folders", "Genres", "Composers", "Years",
-            "Formats", "Recent", "Most played", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
+            "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
+            "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
             val selected = section == name
             nav.addView(actionButton(name) {
                 section = name
@@ -671,11 +672,14 @@ class MainActivity : Activity() {
             val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.genre, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
             !hiddenFolders.contains(t.path) && matches && when (section) {
                 "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
+                "Top rated" -> (ratings[t.id.toString()] ?: 0) >= 4
                 "Favorites" -> favorites.contains(t.id.toString())
                 "Recent" -> recentTrackIds().contains(t.id.toString())
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
+                "Unplayed" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) == 0
                 "Duplicates" -> duplicateTrackIds().contains(t.id.toString())
-                "Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats", "Playlists" -> true
+                "Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats", "Playlists",
+                "Recently added", "Longest", "Shortest", "Large files" -> true
                 else -> true
             }
         }
@@ -687,6 +691,15 @@ class MainActivity : Activity() {
             val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
             return result.sortedByDescending { prefs.getInt("plays_" + it.id, 0) }
         }
+        if (section == "Recently added") return result.sortedByDescending { it.id }
+        if (section == "Unplayed") return result.sortedBy { titleOf(it).lowercase(Locale.ROOT) }
+        if (section == "Top rated") return result.sortedWith(
+            compareByDescending<Track> { ratings[it.id.toString()] ?: 0 }
+                .thenBy { titleOf(it).lowercase(Locale.ROOT) }
+        )
+        if (section == "Longest") return result.sortedByDescending { it.duration }
+        if (section == "Shortest") return result.sortedBy { it.duration }
+        if (section == "Large files") return result.sortedByDescending { it.sizeBytes }
         if (section == "Playlists" && playlistMap.isNotEmpty()) {
             val names = playlistMap.keys.toList()
             val choices = listOf("All songs") + names
@@ -726,6 +739,12 @@ class MainActivity : Activity() {
             section == "Years" -> "${visible.map { if (it.year > 0) it.year.toString() else "Unknown year" }.distinct().size} release-year groups"
             section == "Formats" -> "${visible.map { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" } }.distinct().size} file formats"
             section == "Rated" -> "${visible.size} rated tracks"
+            section == "Top rated" -> "${visible.size} tracks rated 4 or 5 stars"
+            section == "Unplayed" -> "${visible.size} tracks never started"
+            section == "Recently added" -> "${visible.size} tracks · newest library entries first"
+            section == "Longest" -> "${visible.size} tracks · longest first"
+            section == "Shortest" -> "${visible.size} tracks · shortest first"
+            section == "Large files" -> "${visible.size} tracks · largest files first"
             section == "Favorites" -> "${visible.size} favourite tracks"
             section == "Playlists" -> currentPlaylist ?: "${playlistMap.size} playlists · tap ⋮ to manage"
             else -> "${visible.size} songs on this device · sorted by $sortMode"
