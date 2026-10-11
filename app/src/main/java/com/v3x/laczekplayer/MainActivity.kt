@@ -611,14 +611,55 @@ class MainActivity : Activity() {
 
     private fun listRow(title: String, subtitle: String, click: () -> Unit): LinearLayout {
         val row = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(11), dp(10), dp(11))
-            background = roundedBackground(bg, dp(12))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(10), dp(10), dp(10))
+            background = roundedBackground(panel, dp(18))
+            isClickable = true
+            isFocusable = true
             setOnClickListener { click() }
         }
-        row.addView(TextView(this).apply { text = title; textSize = 15f; setTextColor(fg); maxLines = 1 })
-        row.addView(TextView(this).apply { text = subtitle; textSize = 11f; setTextColor(muted); maxLines = 1; setPadding(0, dp(3), 0, 0) })
-        songList.addView(View(this).apply { setBackgroundColor(panel) }, LinearLayout.LayoutParams(-1, dp(1)))
+        val cover = FrameLayout(this).apply {
+            background = roundedBackground(bg, dp(13))
+            clipToPadding = false
+            clipChildren = false
+        }
+        cover.addView(TextView(this).apply {
+            text = "♫"
+            textSize = 21f
+            gravity = Gravity.CENTER
+            setTextColor(orange)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }, FrameLayout.LayoutParams(-1, -1))
+        row.addView(cover, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
+
+        val labels = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        labels.addView(TextView(this).apply {
+            text = title
+            textSize = 14.5f
+            setTextColor(fg)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        labels.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 11f
+            setTextColor(muted)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(4), 0, 0)
+        })
+        row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(TextView(this).apply {
+            text = "›"
+            textSize = 25f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(dp(22), dp(42)))
         return row
     }
 
