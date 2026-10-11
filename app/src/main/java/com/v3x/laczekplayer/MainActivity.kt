@@ -233,6 +233,7 @@ class MainActivity : Activity() {
         }
         val nowRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         artworkView = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; background = roundedBackground(bg, dp(12)); contentDescription = "Album artwork" }
+        artworkView.setOnClickListener { showArtworkPreview() }
         nowRow.addView(artworkView, LinearLayout.LayoutParams(dp(58), dp(58)))
         nowRow.addView(nowPlaying, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
         playerPanel.addView(nowRow)
@@ -543,6 +544,27 @@ class MainActivity : Activity() {
         pendingArtworkTrack = track
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "image/*" }
         startActivityForResult(intent, 209)
+    }
+
+    private fun showArtworkPreview() {
+        val item = controller?.currentMediaItem
+        val track = tracks.firstOrNull { it.id.toString() == item?.mediaId }
+        val uri = track?.let { artworkUri(it) }
+        if (uri == null) {
+            Toast.makeText(this, "No local artwork available for this track", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val preview = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(Color.BLACK)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            contentDescription = "Full-size album artwork"
+            try { setImageURI(uri) } catch (_: Exception) {}
+        }
+        AlertDialog.Builder(this).setTitle(track?.let { titleOf(it) } ?: "Album artwork")
+            .setView(preview)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun mediaItem(t: Track) = MediaItem.Builder().setUri(t.uri).setMediaId(t.id.toString())
