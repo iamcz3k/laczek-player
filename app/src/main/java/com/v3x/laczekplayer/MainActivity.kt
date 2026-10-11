@@ -815,7 +815,7 @@ class MainActivity : Activity() {
             .setNegativeButton("Cancel", null)
             .setPositiveButton("Clear history") { _, _ ->
                 val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
-                val editor = prefs.edit().remove("last_track").remove("recent_order").putLong("listening_ms", 0L)
+                val editor = prefs.edit().remove("last_track").remove("last_position_ms").remove("recent_order").putLong("listening_ms", 0L)
                 prefs.all.keys.filter { it.startsWith("plays_") }.forEach { editor.remove(it) }
                 editor.apply()
                 renderLibrary()
@@ -1125,6 +1125,8 @@ class MainActivity : Activity() {
                             .put("saved_queue", JSONArray(prefs.getString("saved_queue", "[]")))
                             .put("saved_queue_index", prefs.getInt("saved_queue_index", 0))
                             .put("saved_queue_position", prefs.getLong("saved_queue_position", 0L))
+                            .put("last_track", prefs.getLong("last_track", -1L))
+                            .put("last_position_ms", prefs.getLong("last_position_ms", 0L))
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(backup.toString(2)) }
                         Toast.makeText(this, "Local backup exported", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) { Toast.makeText(this, "Backup export failed", Toast.LENGTH_SHORT).show() }
@@ -1167,6 +1169,8 @@ class MainActivity : Activity() {
                             .putString("saved_queue", (backup.optJSONArray("saved_queue") ?: JSONArray()).toString())
                             .putInt("saved_queue_index", backup.optInt("saved_queue_index", 0).coerceAtLeast(0))
                             .putLong("saved_queue_position", backup.optLong("saved_queue_position", 0L).coerceAtLeast(0L))
+                            .putLong("last_track", backup.optLong("last_track", -1L))
+                            .putLong("last_position_ms", backup.optLong("last_position_ms", 0L).coerceAtLeast(0L))
                         val oldPlayKeys = getSharedPreferences("laczek_player", MODE_PRIVATE).all.keys.filter { it.startsWith("plays_") }
                         oldPlayKeys.forEach { prefsEditor.remove(it) }
                         val playKeys = playCounts.keys()
