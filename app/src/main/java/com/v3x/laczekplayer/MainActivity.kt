@@ -1992,6 +1992,16 @@ class MainActivity : Activity() {
                 }
                 playlistArtworkTarget = null
             }
+            213 -> {
+                val uri = data.data
+                val target = playlistArtworkTarget
+                if (uri != null && target != null) {
+                    try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+                    playlistArtworkUris[target] = uri.toString(); saveLocalSettings(); renderLibrary()
+                    Toast.makeText(this, "Playlist artwork saved locally", Toast.LENGTH_SHORT).show()
+                }
+                playlistArtworkTarget = null
+            }
             209 -> {
                 val uri = data.data
                 val track = pendingArtworkTrack
