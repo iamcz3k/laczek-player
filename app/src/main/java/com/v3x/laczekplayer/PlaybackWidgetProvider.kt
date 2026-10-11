@@ -24,6 +24,16 @@ class PlaybackWidgetProvider : AppWidgetProvider() {
             ACTION_OPEN -> {
                 context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
+            ACTION_FAVORITE -> {
+                val prefs = context.getSharedPreferences("laczek_player", Context.MODE_PRIVATE)
+                val id = prefs.getString("widget_media_id", "") ?: ""
+                if (id.isNotBlank()) {
+                    val favorites = (prefs.getStringSet("favorites", emptySet()) ?: emptySet()).toMutableSet()
+                    if (!favorites.add(id)) favorites.remove(id)
+                    prefs.edit().putStringSet("favorites", favorites).putBoolean("widget_favorite", id in favorites).apply()
+                    refresh(context)
+                }
+            }
             ACTION_PLAY_PAUSE, ACTION_NEXT -> {
                 val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
                 val future = MediaController.Builder(context, token).buildAsync()
@@ -47,6 +57,7 @@ class PlaybackWidgetProvider : AppWidgetProvider() {
         const val ACTION_OPEN = "com.v3x.laczekplayer.WIDGET_OPEN"
         const val ACTION_PLAY_PAUSE = "com.v3x.laczekplayer.WIDGET_PLAY_PAUSE"
         const val ACTION_NEXT = "com.v3x.laczekplayer.WIDGET_NEXT"
+        const val ACTION_FAVORITE = "com.v3x.laczekplayer.WIDGET_FAVORITE"
 
         fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -59,13 +70,16 @@ class PlaybackWidgetProvider : AppWidgetProvider() {
             val title = prefs.getString("widget_title", "LaCzek Player") ?: "LaCzek Player"
             val artist = prefs.getString("widget_artist", "Offline music") ?: "Offline music"
             val playing = prefs.getBoolean("widget_playing", false)
+            val favorite = prefs.getBoolean("widget_favorite", false)
             val views = RemoteViews(context.packageName, R.layout.widget_laczek_player)
             views.setTextViewText(R.id.widget_title, title)
             views.setTextViewText(R.id.widget_artist, artist)
             views.setTextViewText(R.id.widget_play_pause, if (playing) "Ⅱ" else "▶")
+            views.setTextViewText(R.id.widget_favorite, if (favorite) "♥" else "♡")
             views.setOnClickPendingIntent(R.id.widget_open, pending(context, ACTION_OPEN, 4101))
             views.setOnClickPendingIntent(R.id.widget_play_pause, pending(context, ACTION_PLAY_PAUSE, 4102))
             views.setOnClickPendingIntent(R.id.widget_next, pending(context, ACTION_NEXT, 4103))
+            views.setOnClickPendingIntent(R.id.widget_favorite, pending(context, ACTION_FAVORITE, 4104))
             manager.updateAppWidget(ids, views)
         }
 
