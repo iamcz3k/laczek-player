@@ -1559,7 +1559,7 @@ class MainActivity : Activity() {
     }
 
     private fun chooseSort() {
-        val modes = arrayOf("Title", "Artist", "Album", "Duration", "Newest")
+        val modes = arrayOf("Title", "Artist", "Album", "Duration", "Shortest", "Newest", "Year newest", "Year oldest", "File size", "Rating", "Play count", "Format")
         AlertDialog.Builder(this).setTitle("Sort library").setSingleChoiceItems(modes, modes.indexOf(sortMode).coerceAtLeast(0)) { d, which ->
             sortMode = modes[which]; saveLocalSettings(); renderLibrary(); d.dismiss()
         }.show()
