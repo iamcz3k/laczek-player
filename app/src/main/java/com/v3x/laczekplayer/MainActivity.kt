@@ -771,12 +771,23 @@ class MainActivity : Activity() {
             val selected = currentPlaylist
             if (selected != null) result = result.filter { it.id.toString() in (playlistMap[selected] ?: emptySet()) }
         }
+        if (section == "Playlists" && currentPlaylist != null) {
+            val order = (playlistMap[currentPlaylist] ?: emptySet()).toList()
+            return result.sortedBy { order.indexOf(it.id.toString()).let { index -> if (index < 0) Int.MAX_VALUE else index } }
+        }
         return when (sortMode) {
-            "Artist" -> result.sortedBy { it.artist.lowercase(Locale.ROOT) }
-            "Album" -> result.sortedBy { it.album.lowercase(Locale.ROOT) }
+            "Artist" -> result.sortedBy { artistOf(it).lowercase(Locale.ROOT) }
+            "Album" -> result.sortedWith(compareBy<Track> { albumOf(it).lowercase(Locale.ROOT) }.thenBy { titleOf(it).lowercase(Locale.ROOT) })
             "Duration" -> result.sortedByDescending { it.duration }
+            "Shortest" -> result.sortedBy { it.duration }
+            "Year newest" -> result.sortedByDescending { yearOf(it) }
+            "Year oldest" -> result.sortedBy { yearOf(it).takeIf { year -> year > 0 } ?: Int.MAX_VALUE }
+            "File size" -> result.sortedByDescending { it.sizeBytes }
+            "Rating" -> result.sortedByDescending { ratings[it.id.toString()] ?: 0 }
+            "Play count" -> result.sortedByDescending { getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + it.id, 0) }
+            "Format" -> result.sortedBy { it.mimeType.lowercase(Locale.ROOT) }
             "Newest" -> result.sortedByDescending { it.id }
-            else -> result.sortedBy { it.title.lowercase(Locale.ROOT) }
+            else -> result.sortedBy { titleOf(it).lowercase(Locale.ROOT) }
         }
     }
     private var currentPlaylist: String? = null
