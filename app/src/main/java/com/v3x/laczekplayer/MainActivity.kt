@@ -2137,6 +2137,14 @@ class MainActivity : Activity() {
     private fun formatTime(ms: Long): String = String.format(Locale.ROOT, "%d:%02d", ms.coerceAtLeast(0) / 60000, (ms.coerceAtLeast(0) / 1000) % 60)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    override fun onResume() {
+        super.onResume()
+        val savedFavorites = getSharedPreferences("laczek_player", MODE_PRIVATE).getStringSet("favorites", emptySet()) ?: emptySet()
+        favorites.clear(); favorites.addAll(savedFavorites)
+        if (::songList.isInitialized) renderLibrary()
+        updatePlaybackUi()
+    }
+
     override fun onPause() {
         persistPlaybackPosition(force = true)
         super.onPause()
