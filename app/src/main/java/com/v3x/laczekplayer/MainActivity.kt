@@ -737,7 +737,7 @@ class MainActivity : Activity() {
     }
 
     private fun showMoreMenu() {
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)")
         AlertDialog.Builder(this).setTitle("LaCzek tools").setItems(options) { _, which ->
             when (which) {
                 0 -> scanLibrary()
@@ -749,16 +749,59 @@ class MainActivity : Activity() {
                 6 -> { dark = !dark; saveLocalSettings(); rebuildUi() }
                 7 -> exportBackup()
                 8 -> importBackup()
-                9 -> { getSharedPreferences("laczek_player", MODE_PRIVATE).edit().remove("last_track").remove("recent_order").apply(); Toast.makeText(this, "Playback history cleared", Toast.LENGTH_SHORT).show() }
+                9 -> clearListeningHistory()
                 10 -> showPlaylistOverview()
                 11 -> chooseAccentColour()
                 12 -> manageHiddenFolders()
                 13 -> saveQueueForLater()
                 14 -> restoreSavedQueue()
                 15 -> showListeningStats()
+                16 -> resumeLastTrack()
+                17 -> exportLibraryIndex()
             }
         }.show()
     }
+
+    private fun clearListeningHistory() {
+        AlertDialog.Builder(this)
+            .setTitle("Clear listening history?")
+            .setMessage("This clears recent tracks, play counts, and total listening time. It will not delete audio files, playlists, ratings, or bookmarks.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Clear history") { _, _ ->
+                val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+                val editor = prefs.edit().remove("last_track").remove("recent_order").putLong("listening_ms", 0L)
+                prefs.all.keys.filter { it.startsWith("plays_") }.forEach { editor.remove(it) }
+                editor.apply()
+                renderLibrary()
+                Toast.makeText(this, "Listening history cleared", Toast.LENGTH_SHORT).show()
+            }.show()
+    }
+
+    private fun resumeLastTrack() {
+        val lastId = getSharedPreferences("laczek_player", MODE_PRIVATE).getLong("last_track", -1L)
+        val track = tracks.firstOrNull { it.id == lastId }
+        if (track == null) {
+            Toast.makeText(this, "No saved last track. Play a song first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        playTrack(track)
+    }
+
+    private fun exportLibraryIndex() {
+        if (tracks.isEmpty()) {
+            Toast.makeText(this, "Scan the library first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/csv"
+            putExtra(Intent.EXTRA_TITLE, "laczek-player-library.csv")
+        }
+        startActivityForResult(intent, 211)
+    }
+
+    private fun csvCell(value: String): String = "\"" + value.replace("\"", "\"\"") + "\""
+
     private fun showListeningStats() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         val totalPlays = prefs.all.filterKeys { it.startsWith("plays_") }.values.sumOf { (it as? Int ?: 0).toLong() }
@@ -1162,6 +1205,28 @@ class MainActivity : Activity() {
                         saveLocalSettings(); section = "Playlists"; currentPlaylist = null; renderLibrary()
                         Toast.makeText(this, "Imported ${imported.size} matching local tracks", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) { Toast.makeText(this, "Could not import this M3U file", Toast.LENGTH_SHORT).show() }
+                }
+            }
+            211 -> {
+                data.data?.let { uri ->
+                    try {
+                        val body = buildString {
+                            append("Title,Artist,Album,Genre,Composer,Year,Duration_ms,Duration,Format,Size_bytes,Folder,Media_ID\\n")
+                            filteredTracks().forEach { track ->
+                                append(listOf(
+                                    titleOf(track), artistOf(track), albumOf(track), track.genre,
+                                    track.composer, if (track.year > 0) track.year.toString() else "",
+                                    track.duration.toString(), formatTime(track.duration), track.mimeType,
+                                    track.sizeBytes.toString(), track.path, track.id.toString()
+                                ).joinToString(",") { csvCell(it) }).append('\\n')
+                            }
+                        }
+                        contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) }
+                            ?: throw IllegalStateException("Could not open export destination")
+                        Toast.makeText(this, "Exported ${filteredTracks().size} tracks to CSV", Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "Library CSV export failed", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
             202 -> {
