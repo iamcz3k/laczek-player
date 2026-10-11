@@ -44,12 +44,12 @@ jobs:
             echo "Offline-only APK must not request INTERNET permission (including merged manifest)" >&2
             exit 1
           fi
-          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-1.8.0.apk
+          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-1.9.0.apk
       - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LACZEKPlayer-1.8.0-debug
-          path: app/build/outputs/apk/debug/LACZEKPlayer-1.8.0.apk
+          name: LACZEKPlayer-1.9.0-debug
+          path: app/build/outputs/apk/debug/LACZEKPlayer-1.9.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Publish easy-download GitHub Release APK
@@ -58,6 +58,6 @@ jobs:
           tag_name: test-build
           name: LaCzek Player Latest Test Build
           make_latest: true
-          files: app/build/outputs/apk/debug/LACZEKPlayer-1.8.0.apk
+          files: app/build/outputs/apk/debug/LACZEKPlayer-1.9.0.apk
           overwrite_files: true
           fail_on_unmatched_files: true
