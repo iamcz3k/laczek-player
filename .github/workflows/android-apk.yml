@@ -46,30 +46,29 @@ jobs:
             echo "Offline-only APK must not request INTERNET permission (including merged manifest)" >&2
             exit 1
           fi
-          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.1.0.apk
+          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.2.0.apk
       - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LACZEKPlayer-2.1.0-debug
-          path: app/build/outputs/apk/debug/LACZEKPlayer-2.1.0.apk
+          name: LACZEKPlayer-2.2.0-debug
+          path: app/build/outputs/apk/debug/LACZEKPlayer-2.2.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Publish easy-download GitHub Release APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1.0
-          name: LaCzek Player v2.1.0
+          tag_name: v2.2.0
+          name: LaCzek Player v2.2.0
           make_latest: true
-          files: app/build/outputs/apk/debug/LACZEKPlayer-2.1.0.apk
+          files: app/build/outputs/apk/debug/LACZEKPlayer-2.2.0.apk
           overwrite_files: true
           body: |
-            LaCzek Player v2.1.0 — immersive player and interface update.
+            LaCzek Player v2.2.0 — smart offline library update.
 
-            - Mini-player stays hidden until a track is loaded and appears on the library screen only.
-            - Selecting a song opens the full-screen Now Playing experience.
-            - Full player includes seek, previous/next, ±15-second seek, shuffle, repeat, queue, lyrics, speed, A-B repeat, equalizer, artwork, favorites, and sleep timer.
-            - Settings and track menus use custom LaCzek-styled bottom sheets.
-            - Offline playback and local library features retained.
+            - Adds Recently added, Unplayed, Top rated, Longest, Shortest, and Large files library views.
+            - Smart views are calculated locally from the device library, play counts, ratings, duration, and file size.
+            - Retains the immersive Now Playing screen and custom LaCzek menus.
+            - Offline playback and local library tools retained.
             - APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
             - Debug APK for device testing.
           fail_on_unmatched_files: true
