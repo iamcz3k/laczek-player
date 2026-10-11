@@ -1011,10 +1011,17 @@ class MainActivity : Activity() {
                 data.data?.let { uri ->
                     try {
                         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+                        val playCounts = JSONObject()
+                        prefs.all.filterKeys { it.startsWith("plays_") }.forEach { (key, value) ->
+                            if (value is Int) playCounts.put(key, value)
+                        }
                         val backup = JSONObject()
+                            .put("format_version", 2)
                             .put("favorites", JSONArray(favorites.toList()))
                             .put("dark", dark)
+                            .put("accent", accentColor)
                             .put("sort", sortMode)
+                            .put("hidden_folders", JSONArray(hiddenFolders.toList()))
                             .put("playlists", JSONArray(prefs.getString("playlists", "[]")))
                             .put("custom_titles", JSONObject(customTitles as Map<*, *>))
                             .put("custom_artists", JSONObject(customArtists as Map<*, *>))
@@ -1022,6 +1029,12 @@ class MainActivity : Activity() {
                             .put("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>))
                             .put("bookmarks", JSONObject(bookmarks as Map<*, *>))
                             .put("ratings", JSONObject(ratings as Map<*, *>))
+                            .put("recent_order", JSONArray(recentTrackIds()))
+                            .put("play_counts", playCounts)
+                            .put("listening_ms", prefs.getLong("listening_ms", 0L))
+                            .put("saved_queue", JSONArray(prefs.getString("saved_queue", "[]")))
+                            .put("saved_queue_index", prefs.getInt("saved_queue_index", 0))
+                            .put("saved_queue_position", prefs.getLong("saved_queue_position", 0L))
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(backup.toString(2)) }
                         Toast.makeText(this, "Local backup exported", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) { Toast.makeText(this, "Backup export failed", Toast.LENGTH_SHORT).show() }
@@ -1036,7 +1049,11 @@ class MainActivity : Activity() {
                         val favs = backup.optJSONArray("favorites") ?: JSONArray()
                         for (i in 0 until favs.length()) favorites.add(favs.optString(i))
                         dark = backup.optBoolean("dark", true)
+                        accentColor = backup.optInt("accent", Color.rgb(255, 138, 61))
                         sortMode = backup.optString("sort", "Title")
+                        hiddenFolders.clear()
+                        val hidden = backup.optJSONArray("hidden_folders") ?: JSONArray()
+                        for (i in 0 until hidden.length()) hiddenFolders.add(hidden.optString(i))
                         customTitles.clear(); readStringMap(backup.optString("custom_titles", "{}"), customTitles)
                         customArtists.clear(); readStringMap(backup.optString("custom_artists", "{}"), customArtists)
                         customAlbums.clear(); readStringMap(backup.optString("custom_albums", "{}"), customAlbums)
@@ -1052,6 +1069,22 @@ class MainActivity : Activity() {
                             for (j in 0 until ids.length()) set.add(ids.optString(j))
                             playlistMap[item.optString("name", "Playlist")] = set
                         }
+                        val recent = backup.optJSONArray("recent_order") ?: JSONArray()
+                        val playCounts = backup.optJSONObject("play_counts") ?: JSONObject()
+                        val prefsEditor = getSharedPreferences("laczek_player", MODE_PRIVATE).edit()
+                            .putString("recent_order", recent.toString())
+                            .putLong("listening_ms", backup.optLong("listening_ms", 0L).coerceAtLeast(0L))
+                            .putString("saved_queue", (backup.optJSONArray("saved_queue") ?: JSONArray()).toString())
+                            .putInt("saved_queue_index", backup.optInt("saved_queue_index", 0).coerceAtLeast(0))
+                            .putLong("saved_queue_position", backup.optLong("saved_queue_position", 0L).coerceAtLeast(0L))
+                        val oldPlayKeys = getSharedPreferences("laczek_player", MODE_PRIVATE).all.keys.filter { it.startsWith("plays_") }
+                        oldPlayKeys.forEach { prefsEditor.remove(it) }
+                        val playKeys = playCounts.keys()
+                        while (playKeys.hasNext()) {
+                            val key = playKeys.next()
+                            prefsEditor.putInt(key, playCounts.optInt(key, 0).coerceAtLeast(0))
+                        }
+                        prefsEditor.apply()
                         saveLocalSettings()
                         rebuildUi()
                         Toast.makeText(this, "Local backup restored", Toast.LENGTH_SHORT).show()
