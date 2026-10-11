@@ -555,7 +555,15 @@ class MainActivity : Activity() {
             try {
                 controller = controllerFuture?.get()
                 controller?.addListener(object : Player.Listener {
-                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) { abStartMs = null; abEndMs = null; abTicker?.let { uiHandler.removeCallbacks(it) }; abTicker = null; updatePlaybackUi() }
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                        abStartMs = null; abEndMs = null; abTicker?.let { uiHandler.removeCallbacks(it) }; abTicker = null
+                        val id = mediaItem?.mediaId?.toLongOrNull()
+                        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+                        if (id != null && prefs.getLong("last_track", -1L) != id) {
+                            tracks.firstOrNull { it.id == id }?.let { recordTrackStarted(it) }
+                        }
+                        updatePlaybackUi()
+                    }
                     override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlaybackUi()
                     override fun onPlaybackStateChanged(playbackState: Int) = updatePlaybackUi()
                 })
@@ -573,19 +581,29 @@ class MainActivity : Activity() {
         p.setMediaItems(list.map { mediaItem(it) }, 0, startPositionMs.coerceAtLeast(0L))
         p.prepare()
         p.play()
+        recordTrackStarted(track)
+        updatePlaybackUi()
+    }
+
+    private fun recordTrackStarted(track: Track) {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         val recent = recentTrackIds().toMutableList()
         recent.remove(track.id.toString())
         recent.add(0, track.id.toString())
-        prefs.edit().putLong("last_track", track.id)
+        prefs.edit()
+            .putLong("last_track", track.id)
+            .putLong("last_position_ms", 0L)
             .putInt("plays_" + track.id, prefs.getInt("plays_" + track.id, 0) + 1)
-            .putString("recent_order", JSONArray(recent.take(200)).toString()).apply()
-        updatePlaybackUi()
+            .putString("recent_order", JSONArray(recent.take(200)).toString())
+            .apply()
     }
+
     private fun playTracks(items: List<Track>) {
+        if (items.isEmpty()) return
         controller?.setMediaItems(items.map { mediaItem(it) }, 0, 0L)
         controller?.prepare()
         controller?.play()
+        recordTrackStarted(items.first())
     }
     private fun togglePlayback() {
         val p = controller ?: return
