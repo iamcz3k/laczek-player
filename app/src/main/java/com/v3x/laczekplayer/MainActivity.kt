@@ -511,7 +511,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(12))
         }
-        listOf("Songs", "Albums", "Artists", "Folders", "Genres", "Composers", "Years",
+        listOf("Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years",
             "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
             "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
             val selected = section == name
@@ -734,6 +734,7 @@ class MainActivity : Activity() {
                 (filterMinSeconds.isBlank() || t.duration >= (filterMinSeconds.toLongOrNull() ?: 0L) * 1000L) &&
                 (filterMaxSeconds.isBlank() || t.duration <= (filterMaxSeconds.toLongOrNull() ?: Long.MAX_VALUE) * 1000L)
             !hiddenFolders.contains(t.path) && t.sizeBytes >= minFileSizeKb * 1024L && t.duration >= minDurationSeconds * 1000L && matches && advancedMatches && when (section) {
+                "Featured artists" -> featuredArtists(t).isNotEmpty()
                 "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
                 "Top rated" -> (ratings[t.id.toString()] ?: 0) >= 4
                 "Favorites" -> favorites.contains(t.id.toString())
@@ -741,7 +742,7 @@ class MainActivity : Activity() {
                 "Most played" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) > 0
                 "Unplayed" -> getSharedPreferences("laczek_player", MODE_PRIVATE).getInt("plays_" + t.id, 0) == 0
                 "Duplicates" -> duplicateTrackIds().contains(t.id.toString())
-                "Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats", "Playlists",
+                "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years", "Formats", "Playlists",
                 "Recently added", "Longest", "Shortest", "Large files" -> true
                 else -> true
             }
@@ -825,10 +826,11 @@ class MainActivity : Activity() {
             val lastTrack = tracks.firstOrNull { it.id == lastId }
             if (lastTrack != null) songList.addView(listRow("▶  Resume ${titleOf(lastTrack)}", "Continue from ${formatTime(prefs.getLong("last_position_ms", 0L))}") { resumeLastTrack() })
         }
-        if (section in listOf("Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats")) {
-            val groups = when (section) {
+        if (section in listOf("Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years", "Formats")) {
+            val groups: Map<String, List<Track>> = when (section) {
                 "Albums" -> visible.groupBy { albumOf(it) }
                 "Artists" -> visible.groupBy { artistOf(it) }
+                "Featured artists" -> visible.flatMap { track -> featuredArtists(track).map { it to track } }.groupBy({ it.first }, { it.second })
                 "Genres" -> visible.groupBy { genreOf(it) }
                 "Composers" -> visible.groupBy { it.composer.ifBlank { "Unknown composer" } }
                 "Years" -> visible.groupBy { if (yearOf(it) > 0) yearOf(it).toString() else "Unknown year" }
@@ -1574,6 +1576,14 @@ class MainActivity : Activity() {
             controller?.prepare(); controller?.play()
             Toast.makeText(this, "Saved queue restored", Toast.LENGTH_SHORT).show()
         } catch (_: Exception) { Toast.makeText(this, "Could not restore the saved queue", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun featuredArtists(track: Track): List<String> {
+        val artist = artistOf(track)
+        val lower = artist.lowercase(Locale.ROOT)
+        val marker = listOf(" feat. ", " feat ", " ft. ", " ft ", " featuring ").firstOrNull { lower.contains(it) } ?: return emptyList()
+        val tail = artist.substring(lower.indexOf(marker) + marker.length).substringBefore(")").substringBefore("]")
+        return tail.split(",", ";", "&", "+", " and ").map { it.trim().trimEnd('.', ',') }.filter { it.isNotBlank() }
     }
 
     private fun chooseSort() {
