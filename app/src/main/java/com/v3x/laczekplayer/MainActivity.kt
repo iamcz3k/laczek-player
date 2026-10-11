@@ -687,8 +687,39 @@ class MainActivity : Activity() {
             val item = p.getMediaItemAt(i)
             (if (i == p.currentMediaItemIndex) "▶ " else "") + (item.mediaMetadata.title ?: item.mediaId)
         }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Queue · " + p.mediaItemCount + " tracks").setItems(labels) { _, which -> p.seekToDefaultPosition(which); p.play() }
-            .setNeutralButton("Clear queue") { _, _ -> p.clearMediaItems() }.show()
+        AlertDialog.Builder(this).setTitle("Queue · " + p.mediaItemCount + " tracks")
+            .setItems(labels) { _, which -> manageQueueItem(which) }
+            .setNeutralButton("Clear queue") { _, _ -> p.clearMediaItems() }
+            .setPositiveButton("Done", null).show()
+    }
+
+    private fun manageQueueItem(index: Int) {
+        val p = controller ?: return
+        if (index !in 0 until p.mediaItemCount) return
+        val item = p.getMediaItemAt(index)
+        val title = item.mediaMetadata.title?.toString() ?: "Queued track"
+        val actions = arrayOf(
+            "Play now",
+            "Move up",
+            "Move down",
+            "Remove from queue"
+        )
+        AlertDialog.Builder(this).setTitle(title).setItems(actions) { _, action ->
+            val player = controller ?: return@setItems
+            if (index !in 0 until player.mediaItemCount) return@setItems
+            when (action) {
+                0 -> { player.seekToDefaultPosition(index); player.play() }
+                1 -> if (index > 0) player.moveMediaItem(index, index - 1)
+                     else Toast.makeText(this, "This track is already first", Toast.LENGTH_SHORT).show()
+                2 -> if (index < player.mediaItemCount - 1) player.moveMediaItem(index, index + 1)
+                     else Toast.makeText(this, "This track is already last", Toast.LENGTH_SHORT).show()
+                3 -> {
+                    player.removeMediaItem(index)
+                    Toast.makeText(this, "Removed from queue", Toast.LENGTH_SHORT).show()
+                }
+            }
+            if (action in 1..3 && player.mediaItemCount > 0) showQueue()
+        }.setNegativeButton("Back") { _, _ -> showQueue() }.show()
     }
 
     private fun managePlaylist(name: String) {
