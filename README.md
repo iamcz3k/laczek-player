@@ -13,7 +13,7 @@ An offline-first Android music player. Playback, library management, playlists, 
 - App-local title/artist/album overrides, star ratings, and per-track playback bookmarks
 - Equalizer presets, custom band controls, bass boost, and virtualizer where supported
 - A-B repeat for looping a section of a track; rename files through Android's media permission flow
-- Offline listening-time and library statistics (time is counted while background playback is active)
+- Offline listening-time and library statistics; recent history and play counts update as tracks actually advance
 - Local LRC/TXT lyrics; timestamped LRC lines follow playback position
 - Sleep timer, stop after current track, fade-out timer, and ±15-second seeking
 - Share/copy local audio files and request Android consent before deleting supported media files
@@ -39,4 +39,4 @@ Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDe
 - Version: 1.9.0
 
 ## Important limits
-This remains an evolving test build, not every item from the original 150+ feature wishlist is implemented. Version 1.9.0 adds the branded launcher icon and per-item queue management, alongside the earlier filtered-library CSV export, resume-last-track, and listening-history reset. CI now checks APK archive integrity, debug signing, package ID, and absence of the Android INTERNET permission before publishing. Hardware-dependent effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. M3U imports match local tracks by media ID or title; external playlist paths may not map on a different device. JSON backup version 2 also preserves accent colour, hidden folders, recent order, play counts, listening time, and saved queue state.
+This remains an evolving test build, not every item from the original 150+ feature wishlist is implemented. Version 1.9.0 adds the branded launcher icon and per-item queue management, alongside the earlier filtered-library CSV export, resume-last-track, and listening-history reset. CI now checks APK archive integrity, debug signing, package ID, and absence of the Android INTERNET permission before publishing. Hardware-dependent effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. M3U imports match local tracks by media ID or title; external playlist paths may not map on a different device. JSON backup version 2 also preserves accent colour, hidden folders, recent order, play counts, listening time, saved queue state, and the last track position.
