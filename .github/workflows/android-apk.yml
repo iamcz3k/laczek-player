@@ -57,11 +57,20 @@ jobs:
       - name: Publish easy-download GitHub Release APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: test-build
-          name: LaCzek Player Latest Test Build
+          tag_name: v1.9.0
+          name: LaCzek Player v1.9.0
           make_latest: true
           files: app/build/outputs/apk/debug/LACZEKPlayer-1.9.0.apk
           overwrite_files: true
+          body: |
+            LaCzek Player v1.9.0 test build.
+
+            - Branded launcher icon and adaptive icon support.
+            - Queue item management: play now, move up/down, remove.
+            - Resume last track from saved playback position.
+            - Offline-only APK verified for package ID, archive integrity, signature, launcher icon, and absence of INTERNET permission.
+
+            This is a debug APK for testing; the full feature wishlist is still in progress.
           fail_on_unmatched_files: true
       - name: Publish build status on commit
         if: always()
