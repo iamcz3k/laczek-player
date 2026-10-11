@@ -1450,7 +1450,7 @@ class MainActivity : Activity() {
     }
 
     private fun managePlaylist(name: String) {
-        val options = arrayOf("Play playlist", "Rename playlist", "Export M3U", "Delete playlist")
+        val options = arrayOf("Play playlist", "Reorder tracks", "Set playlist artwork", "Rename playlist", "Export M3U", "Delete playlist")
         AlertDialog.Builder(this).setTitle(name).setItems(options) { _, which ->
             when (which) {
                 0 -> {
@@ -1458,15 +1458,17 @@ class MainActivity : Activity() {
                     val selected = tracks.filter { it.id.toString() in ids }
                     if (selected.isEmpty()) Toast.makeText(this, "This playlist has no matching local tracks", Toast.LENGTH_SHORT).show() else playTracks(selected)
                 }
-                1 -> {
+                1 -> reorderPlaylist(name)
+                2 -> { playlistArtworkTarget = name; val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "image/*" }; startActivityForResult(intent, 213) }
+                3 -> {
                     val input = EditText(this).apply { setText(name); setTextColor(fg) }
                     AlertDialog.Builder(this).setTitle("Rename playlist").setView(input).setPositiveButton("Save") { _, _ ->
                         val newName = input.text.toString().trim()
                         if (newName.isNotEmpty() && newName != name) { playlistMap[newName] = playlistMap.remove(name) ?: mutableSetOf(); if (currentPlaylist == name) currentPlaylist = newName; saveLocalSettings(); renderLibrary() }
                     }.setNegativeButton("Cancel", null).show()
                 }
-                2 -> { pendingExportPlaylist = name; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/x-mpegurl"; putExtra(Intent.EXTRA_TITLE, name.replace(Regex("[^A-Za-z0-9._ -]"), "_") + ".m3u") }; startActivityForResult(intent, 205) }
-                3 -> AlertDialog.Builder(this).setMessage("Delete playlist $name? The music files will not be deleted.").setPositiveButton("Delete") { _, _ -> playlistMap.remove(name); if (currentPlaylist == name) currentPlaylist = null; saveLocalSettings(); renderLibrary() }.setNegativeButton("Cancel", null).show()
+                4 -> { pendingExportPlaylist = name; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/x-mpegurl"; putExtra(Intent.EXTRA_TITLE, name.replace(Regex("[^A-Za-z0-9._ -]"), "_") + ".m3u") }; startActivityForResult(intent, 205) }
+                5 -> AlertDialog.Builder(this).setMessage("Delete playlist $name? The music files will not be deleted.").setPositiveButton("Delete") { _, _ -> playlistMap.remove(name); playlistArtworkUris.remove(name); if (currentPlaylist == name) currentPlaylist = null; saveLocalSettings(); renderLibrary() }.setNegativeButton("Cancel", null).show()
             }
         }.show()
     }
