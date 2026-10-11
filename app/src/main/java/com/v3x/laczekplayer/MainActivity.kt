@@ -358,7 +358,6 @@ class MainActivity : Activity() {
             "Speed" to { setPlaybackSpeed() },
             "A-B repeat" to { toggleABRepeat() },
             "Equalizer" to { showEqualizer() },
-            "Lyrics" to { showLyrics() },
             "Favorite" to {
                 controller?.currentMediaItem?.mediaId?.let { id ->
                     if (!favorites.add(id)) favorites.remove(id)
@@ -366,6 +365,7 @@ class MainActivity : Activity() {
                     renderLibrary()
                     Toast.makeText(this, if (favorites.contains(id)) "Added to favorites" else "Removed from favorites", Toast.LENGTH_SHORT).show()
                 }
+                Unit
             },
             "Sleep timer" to { setSleepTimer() },
             "Artwork" to { showArtworkPreview() },
