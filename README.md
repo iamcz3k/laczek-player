@@ -26,9 +26,9 @@ An offline-first Android music player. Playback, library management, playlists, 
 - No network permission requested by the app
 
 ## Download the latest APK
-**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/download/test-build/LACZEKPlayer-1.9.0.apk
+**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/latest/download/LACZEKPlayer-1.9.0.apk
 
-If the release asset has not updated yet, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.9.0-debug** artifact ZIP.
+The APK is attached to the versioned [v1.9.0 release](https://github.com/iamcz3k/laczek-player/releases/tag/v1.9.0). If GitHub has not finished publishing it, open [GitHub Actions](https://github.com/iamcz3k/laczek-player/actions), choose the latest successful **Build LaCzek Player APK** run, and download the **LACZEKPlayer-1.9.0-debug** artifact ZIP.
 
 This is a debug APK for testing, not a production-signed release. Android may ask you to allow installation from the browser or file manager.
 
