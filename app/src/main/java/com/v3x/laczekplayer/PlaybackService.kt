@@ -8,9 +8,11 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
+@UnstableApi
 class PlaybackService : MediaSessionService() {
     private var session: MediaSession? = null
     private var player: ExoPlayer? = null
@@ -42,7 +44,7 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        player = ExoPlayer.Builder(this).build().apply {
+        player = ExoPlayer.Builder(this).setSkipSilenceEnabled(getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("skip_silence_enabled", false)).build().apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -78,6 +80,8 @@ class PlaybackService : MediaSessionService() {
     private fun updateCrossfade() {
         val active = player ?: return
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        val skipSilence = prefs.getBoolean("skip_silence_enabled", false)
+        if (active.skipSilenceEnabled != skipSilence) active.skipSilenceEnabled = skipSilence
         if (!prefs.getBoolean("crossfade_enabled", false) || !active.isPlaying ||
             active.currentMediaItemIndex < 0 || active.currentMediaItemIndex + 1 >= active.mediaItemCount) {
             if (!prefs.getBoolean("crossfade_enabled", false) || !active.isPlaying) cancelCrossfade()
