@@ -77,6 +77,12 @@ class MainActivity : Activity() {
     private lateinit var playButton: Button
     private lateinit var seek: SeekBar
     private lateinit var timeText: TextView
+    private var miniPlayerPanel: View? = null
+    private lateinit var miniArtwork: ImageView
+    private lateinit var miniTrackLabel: TextView
+    private lateinit var miniArtistLabel: TextView
+    private lateinit var miniPlayButton: Button
+    private var fullPlayerOpen = false
     private var accentColor = Color.rgb(255, 138, 61)
     private val orange get() = accentColor
     private val bg get() = if (dark) Color.rgb(15, 16, 20) else Color.rgb(247, 247, 250)
@@ -169,6 +175,216 @@ class MainActivity : Activity() {
     private fun titleOf(t: Track) = customTitles[t.id.toString()] ?: t.title
     private fun artistOf(t: Track) = customArtists[t.id.toString()] ?: t.artist
     private fun albumOf(t: Track) = customAlbums[t.id.toString()] ?: t.album
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (fullPlayerOpen) {
+            showLibraryScreen()
+        } else {
+            super.onBackPressed()
+        }
+    }
+
+    private fun showLibraryScreen() {
+        fullPlayerOpen = false
+        buildUi()
+        renderLibrary()
+        updatePlaybackUi()
+    }
+
+    private fun showFullPlayer() {
+        val p = controller
+        val item = p?.currentMediaItem
+        if (item == null) {
+            Toast.makeText(this, "Choose a song first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        fullPlayerOpen = true
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            window.decorView.systemUiVisibility = if (dark) 0 else
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
+
+        val screen = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(10), dp(22), dp(14))
+            setBackgroundColor(bg)
+        }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(18))
+        }
+        top.addView(actionButton("⌄") { showLibraryScreen() }.apply {
+            textSize = 27f
+            background = roundedBackground(panel, dp(17))
+            minWidth = dp(48); minimumWidth = dp(48)
+            minHeight = dp(48); minimumHeight = dp(48)
+            contentDescription = "Back to library"
+        })
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        heading.addView(TextView(this).apply {
+            text = "NOW PLAYING"
+            textSize = 10f
+            letterSpacing = .16f
+            setTextColor(orange)
+            gravity = Gravity.CENTER
+        })
+        heading.addView(TextView(this).apply {
+            text = "LaCzek Player"
+            textSize = 14f
+            setTextColor(fg)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(3), 0, 0)
+        })
+        top.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
+        top.addView(actionButton("⋮") {
+            controller?.currentMediaItem?.mediaId?.let { id ->
+                tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) }
+            }
+        }.apply {
+            textSize = 24f
+            background = roundedBackground(panel, dp(17))
+            minWidth = dp(48); minimumWidth = dp(48)
+            minHeight = dp(48); minimumHeight = dp(48)
+            contentDescription = "Track menu"
+        })
+        screen.addView(top)
+
+        val scroll = ScrollView(this).apply { isFillViewport = true; clipToPadding = false }
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(4), 0, dp(8))
+        }
+        artworkView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = roundedBackground(panel, dp(28))
+            clipToOutline = true
+            contentDescription = "Album artwork"
+            setOnClickListener { showArtworkPreview() }
+        }
+        body.addView(artworkView, LinearLayout.LayoutParams(-1, 0).apply {
+            height = dp(300)
+            width = -1
+            bottomMargin = dp(24)
+        })
+        nowPlaying = TextView(this).apply {
+            text = ""
+            textSize = 22f
+            setTextColor(fg)
+            gravity = Gravity.CENTER
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        body.addView(nowPlaying, LinearLayout.LayoutParams(-1, -2))
+        body.addView(TextView(this).apply {
+            text = item.mediaMetadata.artist?.toString() ?: "Unknown artist"
+            textSize = 14f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(7), 0, dp(3))
+        }, LinearLayout.LayoutParams(-1, -2))
+        val albumText = TextView(this).apply {
+            text = item.mediaMetadata.albumTitle?.toString() ?: "Local audio"
+            textSize = 12f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(10))
+        }
+        body.addView(albumText)
+
+        seek = SeekBar(this).apply {
+            max = 1000
+            progressTintList = android.content.res.ColorStateList.valueOf(orange)
+            thumbTintList = android.content.res.ColorStateList.valueOf(orange)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(if (dark) Color.rgb(65, 67, 76) else Color.rgb(205, 207, 215))
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                    if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
+                }
+                override fun onStartTrackingTouch(bar: SeekBar?) {}
+                override fun onStopTrackingTouch(bar: SeekBar?) {}
+            })
+        }
+        body.addView(seek, LinearLayout.LayoutParams(-1, dp(34)).apply { topMargin = dp(12) })
+        timeText = TextView(this).apply {
+            textSize = 11f
+            setTextColor(muted)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        body.addView(timeText, LinearLayout.LayoutParams(-1, dp(20)))
+        val controls = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(18), 0, dp(18))
+        }
+        controls.addView(actionButton("⏮") { skip(-1) }.apply {
+            textSize = 23f; background = roundedBackground(panel, dp(20))
+        }, LinearLayout.LayoutParams(dp(52), dp(52)).apply { marginEnd = dp(10) })
+        controls.addView(actionButton("−15") { controller?.let { it.seekTo((it.currentPosition - 15000).coerceAtLeast(0)) } }.apply {
+            textSize = 12f; background = roundedBackground(panel, dp(18))
+        }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(10) })
+        playButton = actionButton("▶") { togglePlayback() }.apply {
+            textSize = 26f
+            setTextColor(Color.BLACK)
+            background = roundedBackground(orange, dp(25))
+        }
+        controls.addView(playButton, LinearLayout.LayoutParams(dp(70), dp(62)).apply { marginEnd = dp(10) })
+        controls.addView(actionButton("+15") { controller?.let { it.seekTo((it.currentPosition + 15000).coerceAtMost(it.duration.coerceAtLeast(0))) } }.apply {
+            textSize = 12f; background = roundedBackground(panel, dp(18))
+        }, LinearLayout.LayoutParams(dp(48), dp(52)).apply { marginEnd = dp(10) })
+        controls.addView(actionButton("⏭") { skip(1) }.apply {
+            textSize = 23f; background = roundedBackground(panel, dp(20))
+        }, LinearLayout.LayoutParams(dp(52), dp(52)))
+        body.addView(controls)
+        val toolGrid = GridLayout(this).apply {
+            columnCount = 3
+            rowCount = 3
+            useDefaultMargins = false
+        }
+        listOf(
+            "Shuffle" to { toggleShuffle() },
+            "Repeat" to { cycleRepeat() },
+            "Queue" to { showQueue() },
+            "Lyrics" to { showLyrics() },
+            "Speed" to { setPlaybackSpeed() },
+            "A-B repeat" to { toggleABRepeat() },
+            "Equalizer" to { showEqualizer() },
+            "Artwork" to { showArtworkPreview() },
+            "Track info" to {
+                controller?.currentMediaItem?.mediaId?.let { id ->
+                    tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) }
+                }
+            }
+        ).forEach { (label, action) ->
+            val button = actionButton(label, action).apply {
+                textSize = 12f
+                background = roundedBackground(panel, dp(15))
+                setPadding(dp(6), 0, dp(6), 0)
+                minHeight = dp(46); minimumHeight = dp(46)
+            }
+            val params = GridLayout.LayoutParams().apply {
+                width = 0
+                height = dp(46)
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                setMargins(dp(4), dp(4), dp(4), dp(4))
+            }
+            toolGrid.addView(button, params)
+        }
+        body.addView(toolGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        scroll.addView(body)
+        screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        setContentView(screen)
+        updatePlaybackUi()
+    }
 
     private fun buildUi() {
         window.statusBarColor = bg
@@ -274,136 +490,62 @@ class MainActivity : Activity() {
         scroll.addView(songList)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        val playerPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(12))
-            background = roundedBackground(panel, dp(24))
-            elevation = dp(3).toFloat()
-        }
-        val nowRow = LinearLayout(this).apply {
+        val miniPlayer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(9), dp(10), dp(9))
+            background = roundedBackground(panel, dp(20))
+            elevation = dp(3).toFloat()
+            visibility = View.GONE
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showFullPlayer() }
         }
-        artworkView = ImageView(this).apply {
+        miniArtwork = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = roundedBackground(bg, dp(16))
+            background = roundedBackground(bg, dp(13))
             clipToOutline = true
-            contentDescription = "Album artwork"
-            setImageDrawable(null)
+            contentDescription = "Now playing artwork"
         }
-        artworkView.setOnClickListener { showArtworkPreview() }
-        nowRow.addView(artworkView, LinearLayout.LayoutParams(dp(68), dp(68)))
-        val trackColumn = LinearLayout(this).apply {
+        miniPlayer.addView(miniArtwork, LinearLayout.LayoutParams(dp(48), dp(48)))
+        val miniLabels = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(4), 0)
+            setPadding(dp(11), 0, dp(4), 0)
         }
-        trackColumn.addView(TextView(this).apply {
-            text = "NOW PLAYING"
-            textSize = 9f
-            letterSpacing = .13f
-            setTextColor(orange)
-        })
-        nowPlaying = TextView(this).apply {
-            text = "Choose a song"
-            textSize = 15f
+        miniTrackLabel = TextView(this).apply {
+            text = ""
+            textSize = 13f
             setTextColor(fg)
-            maxLines = 2
             setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding(0, dp(3), 0, dp(2))
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
-        trackColumn.addView(nowPlaying)
-        trackColumn.addView(TextView(this).apply {
-            text = "Local library • No internet"
+        miniArtistLabel = TextView(this).apply {
+            text = ""
             textSize = 11f
             setTextColor(muted)
-        })
-        nowRow.addView(trackColumn, LinearLayout.LayoutParams(0, -2, 1f))
-        nowRow.addView(actionButton("♡") { controller?.currentMediaItem?.let { item ->
-            val id = item.mediaId
-            if (favorites.contains(id)) favorites.remove(id) else favorites.add(id)
-            saveLocalSettings()
-            renderLibrary()
-        } }.apply {
-            textSize = 21f
-            background = roundedBackground(bg, dp(15))
-            minWidth = dp(44); minimumWidth = dp(44)
-            minHeight = dp(44); minimumHeight = dp(44)
-        })
-        playerPanel.addView(nowRow)
-
-        seek = SeekBar(this).apply {
-            max = 1000
-            progressTintList = android.content.res.ColorStateList.valueOf(orange)
-            thumbTintList = android.content.res.ColorStateList.valueOf(orange)
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(if (dark) Color.rgb(65, 67, 76) else Color.rgb(205, 207, 215))
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
-            })
-        }
-        playerPanel.addView(seek, LinearLayout.LayoutParams(-1, dp(30)).apply {
-            topMargin = dp(5); bottomMargin = dp(0)
-        })
-        timeText = TextView(this).apply {
-            textSize = 10f
-            setTextColor(muted)
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        playerPanel.addView(timeText)
-
-        val controls = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(4), 0, dp(4))
-        }
-        controls.addView(actionButton("⏮") { skip(-1) }.apply { textSize = 20f; background = roundedBackground(bg, dp(18)) },
-            LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(6) })
-        controls.addView(actionButton("−15") { controller?.let { it.seekTo((it.currentPosition - 15000).coerceAtLeast(0)) } }.apply {
-            textSize = 12f; background = roundedBackground(bg, dp(16))
-        }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(8) })
-        playButton = actionButton("▶") { togglePlayback() }.apply {
-            textSize = 22f
-            setTextColor(Color.BLACK)
-            background = roundedBackground(orange, dp(22))
-            minWidth = dp(58); minimumWidth = dp(58)
-        }
-        controls.addView(playButton, LinearLayout.LayoutParams(dp(60), dp(52)).apply { marginEnd = dp(8) })
-        controls.addView(actionButton("+15") { controller?.let { it.seekTo((it.currentPosition + 15000).coerceAtMost(it.duration.coerceAtLeast(0))) } }.apply {
-            textSize = 12f; background = roundedBackground(bg, dp(16))
-        }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(6) })
-        controls.addView(actionButton("⏭") { skip(1) }.apply { textSize = 20f; background = roundedBackground(bg, dp(18)) },
-            LinearLayout.LayoutParams(dp(48), dp(48)))
-        playerPanel.addView(controls)
-
-        val toolsScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val tools = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
             setPadding(0, dp(3), 0, 0)
         }
-        listOf(
-            "Shuffle" to { toggleShuffle() },
-            "Repeat" to { cycleRepeat() },
-            "Lyrics" to { showLyrics() },
-            "Speed" to { setPlaybackSpeed() },
-            "A-B" to { toggleABRepeat() },
-            "Queue" to { showQueue() },
-            "EQ" to { showEqualizer() }
-        ).forEach { (label, action) ->
-            tools.addView(actionButton(label, action).apply {
-                textSize = 11f
-                setPadding(dp(12), 0, dp(12), 0)
-                minHeight = dp(34); minimumHeight = dp(34)
-                background = roundedBackground(bg, dp(16))
-            }, LinearLayout.LayoutParams(-2, dp(34)).apply { marginEnd = dp(6) })
+        miniLabels.addView(miniTrackLabel)
+        miniLabels.addView(miniArtistLabel)
+        miniPlayer.addView(miniLabels, LinearLayout.LayoutParams(0, -2, 1f))
+        miniPlayButton = actionButton("▶") { togglePlayback() }.apply {
+            textSize = 20f
+            setTextColor(orange)
+            background = roundedBackground(bg, dp(16))
+            minWidth = dp(46); minimumWidth = dp(46)
+            minHeight = dp(46); minimumHeight = dp(46)
         }
-        toolsScroll.addView(tools)
-        playerPanel.addView(toolsScroll)
-        root.addView(playerPanel)
+        miniPlayer.addView(miniPlayButton)
+        miniPlayer.setOnLongClickListener {
+            controller?.currentMediaItem?.mediaId?.let { id -> tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) } }
+            true
+        }
+        miniPlayerPanel = miniPlayer
+        root.addView(miniPlayer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         setContentView(root)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
@@ -730,13 +872,102 @@ class MainActivity : Activity() {
             .setNeutralButton("Play all") { _, _ -> playTracks(group) }.show()
     }
 
+    private fun showActionSheet(
+        title: String,
+        subtitle: String,
+        options: List<Pair<String, String>>,
+        onSelect: (Int) -> Unit
+    ) {
+        val dialog = android.app.Dialog(this)
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(10), dp(18), dp(18))
+            background = roundedBackground(panel, dp(26))
+        }
+        val grabber = View(this).apply {
+            background = roundedBackground(if (dark) Color.rgb(100, 102, 112) else Color.rgb(185, 187, 196), dp(3))
+        }
+        shell.addView(grabber, LinearLayout.LayoutParams(dp(42), dp(5)).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(17)
+        })
+        shell.addView(TextView(this).apply {
+            text = title
+            textSize = 19f
+            setTextColor(fg)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        if (subtitle.isNotBlank()) shell.addView(TextView(this).apply {
+            text = subtitle
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, dp(5), 0, dp(12))
+        })
+        val list = ScrollView(this).apply { isFillViewport = false }
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        options.forEachIndexed { index, option ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(11), dp(10), dp(11))
+                background = roundedBackground(bg, dp(15))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    dialog.dismiss()
+                    onSelect(index)
+                }
+            }
+            val marker = TextView(this).apply {
+                text = "›"
+                textSize = 22f
+                setTextColor(orange)
+                gravity = Gravity.CENTER
+                background = roundedBackground(panel, dp(12))
+            }
+            row.addView(marker, LinearLayout.LayoutParams(dp(38), dp(38)).apply { marginEnd = dp(12) })
+            val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL }
+            labels.addView(TextView(this).apply {
+                text = option.first
+                textSize = 14f
+                setTextColor(fg)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            if (option.second.isNotBlank()) labels.addView(TextView(this).apply {
+                text = option.second
+                textSize = 11f
+                setTextColor(muted)
+                setPadding(0, dp(3), 0, 0)
+                maxLines = 2
+            })
+            row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+            rows.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) })
+        }
+        list.addView(rows)
+        shell.addView(list, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(14) })
+        dialog.setContentView(shell)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setLayout(-1, dp(520))
+        dialog.window?.setGravity(Gravity.BOTTOM)
+        dialog.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        dialog.window?.attributes = dialog.window?.attributes?.apply { dimAmount = .58f }
+        dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * .78f).toInt())
+        dialog.window?.setGravity(Gravity.BOTTOM)
+    }
+
     private fun showTrackMenu(track: Track) {
         val options = arrayOf(
             if (favorites.contains(track.id.toString())) "Remove favourite" else "Add to favourites",
             "Play next", "Add to queue", "Add to playlist", "Edit local tags", "Rate track",
             "Save playback bookmark", "Jump to bookmark", "Share audio", "Copy audio file", "Delete audio file", "Rename file", "Choose local artwork", "Reset local artwork", "Track details"
         )
-        AlertDialog.Builder(this).setTitle(titleOf(track)).setItems(options) { _, which ->
+        showActionSheet(titleOf(track), "Track options · local library", options.map { it to "" }) { which ->
             when (which) {
                 0 -> { if (!favorites.add(track.id.toString())) favorites.remove(track.id.toString()); saveLocalSettings(); renderLibrary() }
                 1 -> controller?.let { val insertAt = (it.currentMediaItemIndex + 1).coerceIn(0, it.mediaItemCount); it.addMediaItem(insertAt, mediaItem(track)); Toast.makeText(this, "Queued next", Toast.LENGTH_SHORT).show() }
@@ -754,7 +985,7 @@ class MainActivity : Activity() {
                 13 -> { customArtworkUris.remove(artworkKey(track)); saveLocalSettings(); updatePlaybackUi(); Toast.makeText(this, "Custom artwork removed", Toast.LENGTH_SHORT).show() }
                 14 -> AlertDialog.Builder(this).setMessage("Title: ${titleOf(track)}\nArtist: ${artistOf(track)}\nAlbum: ${albumOf(track)}\nGenre: ${track.genre}\nFolder: ${track.path}\nComposer: ${track.composer.ifBlank { "Unknown" }}\nYear: ${if (track.year > 0) track.year else "Unknown"}\nFormat: ${track.mimeType.ifBlank { "Unknown" }}\nFile size: ${formatBytes(track.sizeBytes)}\nDuration: ${formatTime(track.duration)}\nRating: ${ratings[track.id.toString()] ?: 0}/5\nBookmark: ${bookmarks[track.id.toString()]?.let { formatTime(it) } ?: "Not set"}\nURI: ${track.uri}").setPositiveButton("Close", null).show()
             }
-        }.show()
+        }
     }
 
     private fun editLocalTags(track: Track) {
@@ -852,6 +1083,7 @@ class MainActivity : Activity() {
         p.play()
         recordTrackStarted(track)
         updatePlaybackUi()
+        showFullPlayer()
     }
 
     private fun recordTrackStarted(track: Track) {
@@ -873,6 +1105,7 @@ class MainActivity : Activity() {
         controller?.prepare()
         controller?.play()
         recordTrackStarted(items.first())
+        showFullPlayer()
     }
     private fun togglePlayback() {
         val p = controller ?: return
@@ -909,12 +1142,20 @@ class MainActivity : Activity() {
     }
 
     private fun updatePlaybackUi() {
-        if (!::nowPlaying.isInitialized) return
         val p = controller
         val item = p?.currentMediaItem
-        nowPlaying.text = if (item == null) "Choose a song to begin" else
-            "${item.mediaMetadata.title ?: "Unknown title"}\n${item.mediaMetadata.artist ?: "Unknown artist"}"
-        playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+        val hasTrack = item != null
+        miniPlayerPanel?.visibility = if (hasTrack && !fullPlayerOpen) View.VISIBLE else View.GONE
+        if (::miniTrackLabel.isInitialized) {
+            miniTrackLabel.text = item?.mediaMetadata?.title?.toString() ?: ""
+            miniArtistLabel.text = item?.mediaMetadata?.artist?.toString() ?: ""
+            miniPlayButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+            try {
+                val track = tracks.firstOrNull { it.id.toString() == item?.mediaId }
+                val art = track?.let { artworkUri(it) }
+                if (art != null) miniArtwork.setImageURI(art) else miniArtwork.setImageDrawable(null)
+            } catch (_: Exception) { miniArtwork.setImageDrawable(null) }
+        }
         val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
         val widgetPlaying = p?.isPlaying == true
@@ -923,6 +1164,10 @@ class MainActivity : Activity() {
             widgetPrefs.edit().putString("widget_title", widgetTitle).putString("widget_artist", widgetArtist).putBoolean("widget_playing", widgetPlaying).apply()
             PlaybackWidgetProvider.refresh(this)
         }
+        if (!fullPlayerOpen || !::nowPlaying.isInitialized || !::playButton.isInitialized ||
+            !::artworkView.isInitialized || !::seek.isInitialized || !::timeText.isInitialized) return
+        nowPlaying.text = item?.mediaMetadata?.title?.toString() ?: "Unknown title"
+        playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
         val currentTrack = tracks.firstOrNull { it.id.toString() == item?.mediaId }
         try { val art = currentTrack?.let { artworkUri(it) }; if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null) } catch (_: Exception) { artworkView.setImageDrawable(null) }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
@@ -1071,7 +1316,7 @@ class MainActivity : Activity() {
 
     private fun showMoreMenu() {
         val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)")
-        AlertDialog.Builder(this).setTitle("LaCzek tools").setItems(options) { _, which ->
+        showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
             when (which) {
                 0 -> scanLibrary()
                 1 -> chooseSort()
@@ -1092,7 +1337,7 @@ class MainActivity : Activity() {
                 16 -> resumeLastTrack()
                 17 -> exportLibraryIndex()
             }
-        }.show()
+        }
     }
 
     private fun clearListeningHistory() {
