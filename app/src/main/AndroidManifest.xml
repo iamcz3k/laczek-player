@@ -31,6 +31,7 @@
                 <action android:name="com.v3x.laczekplayer.WIDGET_OPEN" />
                 <action android:name="com.v3x.laczekplayer.WIDGET_PLAY_PAUSE" />
                 <action android:name="com.v3x.laczekplayer.WIDGET_NEXT" />
+                <action android:name="com.v3x.laczekplayer.WIDGET_FAVORITE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/laczek_player_widget_info" />
         </receiver>
