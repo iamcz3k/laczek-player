@@ -849,7 +849,9 @@ class MainActivity : Activity() {
             Toast.makeText(this, "No saved last track. Play a song first.", Toast.LENGTH_SHORT).show()
             return
         }
-        playTrack(track, prefs.getLong("last_position_ms", 0L).coerceAtLeast(0L))
+        val savedPosition = prefs.getLong("last_position_ms", 0L).coerceAtLeast(0L)
+        val safePosition = if (track.duration > 1_000L) savedPosition.coerceAtMost(track.duration - 1_000L) else 0L
+        playTrack(track, safePosition)
     }
 
     private fun exportLibraryIndex() {
