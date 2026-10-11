@@ -9,6 +9,7 @@ import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.BitmapFactory
 import android.media.audiofx.Equalizer
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Virtualizer
@@ -50,9 +51,21 @@ class MainActivity : Activity() {
     private val customTitles = mutableMapOf<String, String>()
     private val customArtists = mutableMapOf<String, String>()
     private val customAlbums = mutableMapOf<String, String>()
+    private val customGenres = mutableMapOf<String, String>()
+    private val customYears = mutableMapOf<String, String>()
+    private val lyricsByTrack = mutableMapOf<String, String>()
+    private val trackSpeeds = mutableMapOf<String, Float>()
     private val customArtworkUris = mutableMapOf<String, String>()
     private var section = "Songs"
     private var query = ""
+    private var filterArtist = ""
+    private var filterYear = ""
+    private var filterFormat = ""
+    private var filterMinSeconds = ""
+    private var filterMaxSeconds = ""
+    private var selectionMode = false
+    private val selectedTrackIds = mutableSetOf<String>()
+    private var lastAccentTrackId = ""
     private val uiHandler = Handler(Looper.getMainLooper())
     private var uiTicker: Runnable? = null
     private var sortMode = "Title"
@@ -110,6 +123,10 @@ class MainActivity : Activity() {
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
         readStringMap(prefs.getString("custom_artists", "{}"), customArtists)
         readStringMap(prefs.getString("custom_albums", "{}"), customAlbums)
+        readStringMap(prefs.getString("custom_genres", "{}"), customGenres)
+        readStringMap(prefs.getString("custom_years", "{}"), customYears)
+        readStringMap(prefs.getString("lyrics_by_track", "{}"), lyricsByTrack)
+        try { val speeds = JSONObject(prefs.getString("track_speeds", "{}")); val keys = speeds.keys(); while (keys.hasNext()) { val key = keys.next(); trackSpeeds[key] = speeds.optDouble(key, 1.0).toFloat().coerceIn(0.25f, 3.0f) } } catch (_: Exception) {}
         readStringMap(prefs.getString("custom_artwork_uris", "{}"), customArtworkUris)
         readLongMap(prefs.getString("bookmarks", "{}"), bookmarks)
         readIntMap(prefs.getString("ratings", "{}"), ratings)
@@ -144,6 +161,10 @@ class MainActivity : Activity() {
             .putString("custom_titles", JSONObject(customTitles as Map<*, *>).toString())
             .putString("custom_artists", JSONObject(customArtists as Map<*, *>).toString())
             .putString("custom_albums", JSONObject(customAlbums as Map<*, *>).toString())
+            .putString("custom_genres", JSONObject(customGenres as Map<*, *>).toString())
+            .putString("custom_years", JSONObject(customYears as Map<*, *>).toString())
+            .putString("lyrics_by_track", JSONObject(lyricsByTrack as Map<*, *>).toString())
+            .putString("track_speeds", JSONObject(trackSpeeds.mapValues { it.value.toDouble() } as Map<*, *>).toString())
             .putString("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>).toString())
             .putString("bookmarks", JSONObject(bookmarks as Map<*, *>).toString())
             .putString("ratings", JSONObject(ratings as Map<*, *>).toString())
@@ -175,6 +196,8 @@ class MainActivity : Activity() {
     private fun titleOf(t: Track) = customTitles[t.id.toString()] ?: t.title
     private fun artistOf(t: Track) = customArtists[t.id.toString()] ?: t.artist
     private fun albumOf(t: Track) = customAlbums[t.id.toString()] ?: t.album
+    private fun genreOf(t: Track) = customGenres[t.id.toString()] ?: t.genre
+    private fun yearOf(t: Track) = customYears[t.id.toString()]?.toIntOrNull() ?: t.year
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
@@ -432,6 +455,11 @@ class MainActivity : Activity() {
             setPadding(0, dp(2), 0, 0)
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(actionButton(if (selectionMode) "Done" else "Select") {
+            selectionMode = !selectionMode
+            if (selectionMode) { section = "Songs"; currentPlaylist = null } else selectedTrackIds.clear()
+            renderLibrary(); buildUiSelectionRefresh()
+        }.apply { textSize = 12f; setPadding(dp(7), 0, dp(7), 0); minWidth = dp(58); minimumWidth = dp(58); minHeight = dp(44); minimumHeight = dp(44); background = roundedBackground(panel, dp(14)) })
         header.addView(actionButton("⚙") { showMoreMenu() }.apply {
             textSize = 20f
             background = roundedBackground(panel, dp(16))
@@ -451,7 +479,10 @@ class MainActivity : Activity() {
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             addTextChangedListener(SimpleTextWatcher { query = it.trim(); renderLibrary() })
         }
-        root.addView(search, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(12) })
+        val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f).apply { marginEnd = dp(8) })
+        searchRow.addView(actionButton("Filters") { showAdvancedSearch() }.apply { textSize = 12f; background = roundedBackground(panel, dp(16)); minWidth = dp(78); minimumWidth = dp(78); minHeight = dp(48); minimumHeight = dp(48) })
+        root.addView(searchRow, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
         val navScroll = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
@@ -560,6 +591,8 @@ class MainActivity : Activity() {
         root.addView(miniPlayer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         setContentView(root)
+        root.alpha = 0.94f; root.translationY = dp(8).toFloat()
+        root.animate().alpha(1f).translationY(0f).setDuration(180L).start()
         uiTicker?.let { uiHandler.removeCallbacks(it) }
         abTicker?.let { uiHandler.removeCallbacks(it) }
         uiTicker = object : Runnable {
@@ -587,7 +620,14 @@ class MainActivity : Activity() {
         isAllCaps = false
         setTextColor(fg)
         backgroundTintList = android.content.res.ColorStateList.valueOf(panel)
-        setOnClickListener { action() }
+        stateListAnimator = null
+        setOnClickListener {
+            animate().cancel()
+            animate().scaleX(0.96f).scaleY(0.96f).setDuration(65L).withEndAction {
+                animate().scaleX(1f).scaleY(1f).setDuration(105L).start()
+                action()
+            }.start()
+        }
     }
 
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
@@ -669,8 +709,13 @@ class MainActivity : Activity() {
 
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
-            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, t.genre, t.composer, t.year.toString(), t.mimeType).any { it.contains(query, true) }
-            !hiddenFolders.contains(t.path) && matches && when (section) {
+            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, genreOf(t), t.composer, yearOf(t).toString(), t.mimeType).any { it.contains(query, true) }
+            val advancedMatches = (filterArtist.isBlank() || artistOf(t).contains(filterArtist, true)) &&
+                (filterYear.isBlank() || yearOf(t).toString().contains(filterYear, true)) &&
+                (filterFormat.isBlank() || t.mimeType.substringAfter("/", t.mimeType).contains(filterFormat, true)) &&
+                (filterMinSeconds.isBlank() || t.duration >= (filterMinSeconds.toLongOrNull() ?: 0L) * 1000L) &&
+                (filterMaxSeconds.isBlank() || t.duration <= (filterMaxSeconds.toLongOrNull() ?: Long.MAX_VALUE) * 1000L)
+            !hiddenFolders.contains(t.path) && matches && advancedMatches && when (section) {
                 "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
                 "Top rated" -> (ratings[t.id.toString()] ?: 0) >= 4
                 "Favorites" -> favorites.contains(t.id.toString())
@@ -749,13 +794,26 @@ class MainActivity : Activity() {
             section == "Playlists" -> currentPlaylist ?: "${playlistMap.size} playlists · tap ⋮ to manage"
             else -> "${visible.size} songs on this device · sorted by $sortMode"
         }
+        if (selectionMode) {
+            val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(4), 0, dp(10)) }
+            listOf("Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "Playlist" to { playlistSelectedTracks() }, "Clear" to { selectedTrackIds.clear(); renderLibrary() }).forEach { (label, action) ->
+                actions.addView(actionButton(label, action).apply { textSize = 11f; background = roundedBackground(panel, dp(14)); minHeight = dp(42); minimumHeight = dp(42) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) })
+            }
+            songList.addView(TextView(this).apply { text = "${selectedTrackIds.size} selected · tap songs to select"; setTextColor(orange); textSize = 12f; setPadding(dp(2), dp(4), 0, dp(7)) })
+            songList.addView(actions)
+        } else if (controller?.currentMediaItem == null) {
+            val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+            val lastId = prefs.getLong("last_track", -1L)
+            val lastTrack = tracks.firstOrNull { it.id == lastId }
+            if (lastTrack != null) songList.addView(listRow("▶  Resume ${titleOf(lastTrack)}", "Continue from ${formatTime(prefs.getLong("last_position_ms", 0L))}") { resumeLastTrack() })
+        }
         if (section in listOf("Albums", "Artists", "Folders", "Genres", "Composers", "Years", "Formats")) {
             val groups = when (section) {
                 "Albums" -> visible.groupBy { albumOf(it) }
                 "Artists" -> visible.groupBy { artistOf(it) }
-                "Genres" -> visible.groupBy { it.genre }
+                "Genres" -> visible.groupBy { genreOf(it) }
                 "Composers" -> visible.groupBy { it.composer.ifBlank { "Unknown composer" } }
-                "Years" -> visible.groupBy { if (it.year > 0) it.year.toString() else "Unknown year" }
+                "Years" -> visible.groupBy { if (yearOf(it) > 0) yearOf(it).toString() else "Unknown year" }
                 "Formats" -> visible.groupBy { it.mimeType.substringAfter("/", it.mimeType).ifBlank { "Unknown format" }.uppercase(Locale.ROOT) }
                 else -> visible.groupBy { it.path }
             }
@@ -785,11 +843,11 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(9), dp(5), dp(9))
-            background = roundedBackground(if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else panel, dp(18))
+            background = roundedBackground(if (track.id.toString() in selectedTrackIds) Color.argb(if (dark) 65 else 45, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else panel, dp(18))
             isClickable = true
             isFocusable = true
-            setOnClickListener { playTrack(track) }
-            setOnLongClickListener { showTrackMenu(track); true }
+            setOnClickListener { if (selectionMode) toggleTrackSelection(track) else playTrack(track) }
+            setOnLongClickListener { if (selectionMode) toggleTrackSelection(track) else showTrackMenu(track); true }
         }
         val art = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -1023,13 +1081,17 @@ class MainActivity : Activity() {
         val title = EditText(this).apply { hint = "Song title"; setText(titleOf(track)); setTextColor(fg) }
         val artist = EditText(this).apply { hint = "Artist"; setText(artistOf(track)); setTextColor(fg) }
         val album = EditText(this).apply { hint = "Album"; setText(albumOf(track)); setTextColor(fg) }
-        box.addView(title); box.addView(artist); box.addView(album)
+        val genre = EditText(this).apply { hint = "Genre"; setText(genreOf(track)); setTextColor(fg) }
+        val year = EditText(this).apply { hint = "Year"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setText(if (yearOf(track) > 0) yearOf(track).toString() else ""); setTextColor(fg) }
+        box.addView(title); box.addView(artist); box.addView(album); box.addView(genre); box.addView(year)
         AlertDialog.Builder(this).setTitle("Edit tags in LaCzek Player").setMessage("These overrides are stored locally in the app; the original audio file is not modified.")
             .setView(box).setPositiveButton("Save") { _, _ ->
                 val id = track.id.toString()
                 customTitles[id] = title.text.toString().trim().ifEmpty { track.title }
                 customArtists[id] = artist.text.toString().trim().ifEmpty { track.artist }
                 customAlbums[id] = album.text.toString().trim().ifEmpty { track.album }
+                customGenres[id] = genre.text.toString().trim().ifEmpty { track.genre }
+                customYears[id] = year.text.toString().trim().takeIf { it.isNotBlank() && it.toIntOrNull() != null } ?: "${track.year}"
                 saveLocalSettings(); renderLibrary()
             }.setNegativeButton("Cancel", null).show()
     }
@@ -1092,6 +1154,9 @@ class MainActivity : Activity() {
                         if (id != null && prefs.getLong("last_track", -1L) != id) {
                             tracks.firstOrNull { it.id == id }?.let { recordTrackStarted(it) }
                         }
+                        mediaItem?.mediaId?.let { id -> lyricText = lyricsByTrack[id] ?: "" }
+                        applySavedSpeed(mediaItem)
+                        mediaItem?.mediaId?.let { id -> tracks.firstOrNull { it.id.toString() == id }?.let { updateArtworkAccent(it) } }
                         updatePlaybackUi()
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) = updatePlaybackUi()
@@ -1186,12 +1251,15 @@ class MainActivity : Activity() {
                 if (art != null) miniArtwork.setImageURI(art) else miniArtwork.setImageDrawable(null)
             } catch (_: Exception) { miniArtwork.setImageDrawable(null) }
         }
+        val currentId = item?.mediaId ?: ""
+        if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
         val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
         val widgetPlaying = p?.isPlaying == true
+        val widgetFavorite = currentId.isNotBlank() && favorites.contains(currentId)
         val widgetPrefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
-        if (widgetPrefs.getString("widget_title", "") != widgetTitle || widgetPrefs.getString("widget_artist", "") != widgetArtist || widgetPrefs.getBoolean("widget_playing", false) != widgetPlaying) {
-            widgetPrefs.edit().putString("widget_title", widgetTitle).putString("widget_artist", widgetArtist).putBoolean("widget_playing", widgetPlaying).apply()
+        if (widgetPrefs.getString("widget_title", "") != widgetTitle || widgetPrefs.getString("widget_artist", "") != widgetArtist || widgetPrefs.getBoolean("widget_playing", false) != widgetPlaying || widgetPrefs.getString("widget_media_id", "") != currentId || widgetPrefs.getBoolean("widget_favorite", false) != widgetFavorite) {
+            widgetPrefs.edit().putString("widget_title", widgetTitle).putString("widget_artist", widgetArtist).putBoolean("widget_playing", widgetPlaying).putString("widget_media_id", currentId).putBoolean("widget_favorite", widgetFavorite).apply()
             PlaybackWidgetProvider.refresh(this)
         }
         if (!fullPlayerOpen || !::nowPlaying.isInitialized || !::playButton.isInitialized ||
@@ -1246,12 +1314,19 @@ class MainActivity : Activity() {
     private fun setPlaybackSpeed() {
         val speeds = floatArrayOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
         val labels = speeds.map { it.toString() + "×" }.toTypedArray()
-        val current = controller?.playbackParameters?.speed ?: 1f
+        val id = controller?.currentMediaItem?.mediaId
+        val current = id?.let { trackSpeeds[it] } ?: (controller?.playbackParameters?.speed ?: 1f)
         val selected = speeds.indices.minByOrNull { kotlin.math.abs(speeds[it] - current) } ?: 2
-        AlertDialog.Builder(this).setTitle("Playback speed").setSingleChoiceItems(labels, selected) { dialog, which ->
+        AlertDialog.Builder(this).setTitle("Playback speed · saved per track").setSingleChoiceItems(labels, selected) { dialog, which ->
             controller?.setPlaybackSpeed(speeds[which])
+            if (id != null) { trackSpeeds[id] = speeds[which]; saveLocalSettings() }
             dialog.dismiss()
         }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun applySavedSpeed(mediaItem: MediaItem?) {
+        val id = mediaItem?.mediaId ?: return
+        controller?.setPlaybackSpeed(trackSpeeds[id] ?: 1.0f)
     }
 
     private fun showQueue() {
@@ -1345,7 +1420,9 @@ class MainActivity : Activity() {
     }
 
     private fun showMoreMenu() {
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)")
+        val crossfade = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("crossfade_enabled", false)
+        val artworkColors = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("artwork_colors", true)
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select")
         showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
             when (which) {
                 0 -> scanLibrary()
@@ -1366,6 +1443,10 @@ class MainActivity : Activity() {
                 15 -> showListeningStats()
                 16 -> resumeLastTrack()
                 17 -> exportLibraryIndex()
+                18 -> showAdvancedSearch()
+                19 -> { val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE); prefs.edit().putBoolean("crossfade_enabled", !crossfade).apply(); Toast.makeText(this, "Crossfade ${if (!crossfade) "enabled" else "disabled"}", Toast.LENGTH_SHORT).show() }
+                20 -> { val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE); prefs.edit().putBoolean("artwork_colors", !artworkColors).apply(); lastAccentTrackId = ""; if (artworkColors) accentColor = Color.rgb(255, 138, 61) else controller?.currentMediaItem?.mediaId?.let { id -> tracks.firstOrNull { it.id.toString() == id }?.let { updateArtworkAccent(it) } }; rebuildUi() }
+                21 -> { selectionMode = !selectionMode; if (selectionMode) section = "Songs" else selectedTrackIds.clear(); rebuildUi() }
             }
         }
     }
@@ -1524,6 +1605,25 @@ class MainActivity : Activity() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*" }
         startActivityForResult(i, 201)
     }
+
+    private fun showLyricsEditor() {
+        val id = controller?.currentMediaItem?.mediaId
+        if (id == null) { Toast.makeText(this, "Play a track before editing its lyrics", Toast.LENGTH_SHORT).show(); return }
+        val editor = EditText(this).apply {
+            setText(lyricsByTrack[id] ?: lyricText); setTextColor(fg); setHintTextColor(muted)
+            hint = "[00:12.34] First line of lyrics"; minLines = 8; gravity = Gravity.TOP
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setPadding(dp(14), dp(12), dp(14), dp(12)); background = roundedBackground(panel, dp(14))
+        }
+        AlertDialog.Builder(this).setTitle("Local synced lyrics (.LRC)")
+            .setMessage("Use timestamps such as [00:12.34]. Saved only on this phone.").setView(editor)
+            .setPositiveButton("Save lyrics") { _, _ ->
+                val text = editor.text.toString().take(100_000); lyricsByTrack[id] = text; lyricText = text; saveLocalSettings()
+                Toast.makeText(this, "Lyrics saved for this track", Toast.LENGTH_SHORT).show(); showLyrics()
+            }
+            .setNeutralButton("Import LRC file") { _, _ -> chooseLyrics() }
+            .setNegativeButton("Cancel", null).show()
+    }
     private data class TimedLyric(val timeMs: Long, val text: String)
 
     private fun parseLyrics(): List<TimedLyric> {
@@ -1544,7 +1644,9 @@ class MainActivity : Activity() {
     }
 
     private fun showLyrics() {
-        if (lyricText.isBlank()) { chooseLyrics(); return }
+        val id = controller?.currentMediaItem?.mediaId
+        if (id != null && lyricsByTrack.containsKey(id)) lyricText = lyricsByTrack[id] ?: ""
+        if (lyricText.isBlank()) { showLyricsEditor(); return }
         val lines = parseLyrics()
         val scroll = ScrollView(this)
         val textView = TextView(this).apply {
@@ -1554,7 +1656,8 @@ class MainActivity : Activity() {
         }
         scroll.addView(textView)
         val dialog = AlertDialog.Builder(this).setTitle("Synchronized local lyrics")
-            .setView(scroll).setPositiveButton("Load another file") { _, _ -> chooseLyrics() }
+            .setView(scroll).setPositiveButton("Edit lyrics") { _, _ -> showLyricsEditor() }
+            .setNeutralButton("Load LRC file") { _, _ -> chooseLyrics() }
             .setNegativeButton("Close", null).create()
         lyricHandler?.let { handler -> lyricRunnable?.let { handler.removeCallbacks(it) } }
         lyricHandler = Handler(Looper.getMainLooper())
@@ -1657,6 +1760,7 @@ class MainActivity : Activity() {
                 data.data?.let { uri ->
                     try {
                         contentResolver.openInputStream(uri)?.bufferedReader()?.use { lyricText = it.readText().take(100_000) }
+                        controller?.currentMediaItem?.mediaId?.let { id -> lyricsByTrack[id] = lyricText; saveLocalSettings() }
                         showLyrics()
                     } catch (_: Exception) { Toast.makeText(this, "Could not read this lyrics file", Toast.LENGTH_SHORT).show() }
                 }
@@ -1680,6 +1784,10 @@ class MainActivity : Activity() {
                             .put("custom_titles", JSONObject(customTitles as Map<*, *>))
                             .put("custom_artists", JSONObject(customArtists as Map<*, *>))
                             .put("custom_albums", JSONObject(customAlbums as Map<*, *>))
+                            .put("custom_genres", JSONObject(customGenres as Map<*, *>))
+                            .put("custom_years", JSONObject(customYears as Map<*, *>))
+                            .put("lyrics_by_track", JSONObject(lyricsByTrack as Map<*, *>))
+                            .put("track_speeds", JSONObject(trackSpeeds.mapValues { it.value.toDouble() } as Map<*, *>))
                             .put("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>))
                             .put("bookmarks", JSONObject(bookmarks as Map<*, *>))
                             .put("ratings", JSONObject(ratings as Map<*, *>))
@@ -1713,6 +1821,10 @@ class MainActivity : Activity() {
                         customTitles.clear(); readStringMap(backup.optString("custom_titles", "{}"), customTitles)
                         customArtists.clear(); readStringMap(backup.optString("custom_artists", "{}"), customArtists)
                         customAlbums.clear(); readStringMap(backup.optString("custom_albums", "{}"), customAlbums)
+                        customGenres.clear(); readStringMap(backup.optString("custom_genres", "{}"), customGenres)
+                        customYears.clear(); readStringMap(backup.optString("custom_years", "{}"), customYears)
+                        lyricsByTrack.clear(); readStringMap(backup.optString("lyrics_by_track", "{}"), lyricsByTrack)
+                        try { val speeds = JSONObject(backup.optString("track_speeds", "{}")); val keys = speeds.keys(); while (keys.hasNext()) { val key = keys.next(); trackSpeeds[key] = speeds.optDouble(key, 1.0).toFloat() } } catch (_: Exception) {}
                         customArtworkUris.clear(); readStringMap(backup.optString("custom_artwork_uris", "{}"), customArtworkUris)
                         bookmarks.clear(); readLongMap(backup.optString("bookmarks", "{}"), bookmarks)
                         ratings.clear(); readIntMap(backup.optString("ratings", "{}"), ratings)
@@ -1918,6 +2030,103 @@ class MainActivity : Activity() {
         val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "application/json" }
         startActivityForResult(i, 204)
     }
+
+    private fun buildUiSelectionRefresh() {
+        if (!::root.isInitialized) return
+        val header = root.getChildAt(0) as? LinearLayout ?: return
+        if (header.childCount > 1) (header.getChildAt(1) as? Button)?.text = if (selectionMode) "Done" else "Select"
+    }
+
+    private fun toggleTrackSelection(track: Track) {
+        val id = track.id.toString()
+        if (!selectedTrackIds.add(id)) selectedTrackIds.remove(id)
+        renderLibrary()
+    }
+
+    private fun selectedTracks(): List<Track> = tracks.filter { it.id.toString() in selectedTrackIds }
+
+    private fun queueSelectedTracks() {
+        val chosen = selectedTracks()
+        if (chosen.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
+        val p = controller ?: return
+        if (p.currentMediaItem == null) { p.setMediaItems(chosen.map { mediaItem(it) }); p.prepare(); p.play() }
+        else p.addMediaItems(chosen.map { mediaItem(it) })
+        Toast.makeText(this, "Queued ${chosen.size} tracks", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun favoriteSelectedTracks() {
+        val ids = selectedTrackIds.toList()
+        if (ids.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
+        val remove = ids.all { it in favorites }
+        if (remove) favorites.removeAll(ids.toSet()) else favorites.addAll(ids)
+        saveLocalSettings(); renderLibrary()
+        Toast.makeText(this, if (remove) "Removed ${ids.size} favourites" else "Added ${ids.size} favourites", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun playlistSelectedTracks() {
+        val ids = selectedTrackIds.toSet()
+        if (ids.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
+        val input = EditText(this).apply { hint = "Playlist name"; setTextColor(fg) }
+        AlertDialog.Builder(this).setTitle("Save selection as playlist").setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotBlank()) { playlistMap[name] = ids.toMutableSet(); saveLocalSettings(); section = "Playlists"; currentPlaylist = name; selectionMode = false; selectedTrackIds.clear(); rebuildUi() }
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun showAdvancedSearch() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), 0, dp(18), 0) }
+        fun field(label: String, value: String, numeric: Boolean = false): EditText = EditText(this).apply {
+            hint = label; setText(value); setTextColor(fg); setHintTextColor(muted)
+            if (numeric) inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        }
+        val artist = field("Artist contains", filterArtist)
+        val year = field("Year", filterYear, true)
+        val format = field("Format (mp3, flac, m4a...)", filterFormat)
+        val min = field("Minimum duration in seconds", filterMinSeconds, true)
+        val max = field("Maximum duration in seconds", filterMaxSeconds, true)
+        listOf(artist, year, format, min, max).forEach { box.addView(it) }
+        AlertDialog.Builder(this).setTitle("Advanced offline search")
+            .setMessage("Combine filters with the search box. Leave a field empty to ignore it.")
+            .setView(box)
+            .setPositiveButton("Apply") { _, _ ->
+                filterArtist = artist.text.toString().trim(); filterYear = year.text.toString().trim()
+                filterFormat = format.text.toString().trim(); filterMinSeconds = min.text.toString().trim(); filterMaxSeconds = max.text.toString().trim()
+                renderLibrary()
+            }
+            .setNeutralButton("Clear filters") { _, _ -> filterArtist = ""; filterYear = ""; filterFormat = ""; filterMinSeconds = ""; filterMaxSeconds = ""; renderLibrary() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun updateArtworkAccent(track: Track) {
+        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        if (!prefs.getBoolean("artwork_colors", true)) return
+        val key = track.id.toString()
+        if (key == lastAccentTrackId) return
+        lastAccentTrackId = key
+        val uri = artworkUri(track) ?: return
+        try {
+            val bitmap = contentResolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply { inSampleSize = 8 })
+            } ?: return
+            var red = 0L; var green = 0L; var blue = 0L; var count = 0L
+            val stepX = (bitmap.width / 24).coerceAtLeast(1); val stepY = (bitmap.height / 24).coerceAtLeast(1)
+            for (y in 0 until bitmap.height step stepY) for (x in 0 until bitmap.width step stepX) {
+                val pixel = bitmap.getPixel(x, y); red += Color.red(pixel); green += Color.green(pixel); blue += Color.blue(pixel); count++
+            }
+            bitmap.recycle()
+            if (count > 0) {
+                var r = (red / count).toInt(); var g = (green / count).toInt(); var b = (blue / count).toInt()
+                if (maxOf(r, g, b) - minOf(r, g, b) < 22) { r = 255; g = 138; b = 61 }
+                else if (maxOf(r, g, b) < 105) { r = (r + 65).coerceAtMost(255); g = (g + 65).coerceAtMost(255); b = (b + 65).coerceAtMost(255) }
+                accentColor = Color.rgb(r, g, b)
+                if (::seek.isInitialized) { seek.progressTintList = android.content.res.ColorStateList.valueOf(orange); seek.thumbTintList = android.content.res.ColorStateList.valueOf(orange) }
+                if (::playButton.isInitialized) playButton.background = roundedBackground(orange, dp(25))
+                if (::miniPlayButton.isInitialized) miniPlayButton.setTextColor(orange)
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun rebuildUi() {
         buildUi()
         if (::status.isInitialized) renderLibrary()
