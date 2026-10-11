@@ -607,6 +607,7 @@ class MainActivity : Activity() {
             true
         }
         miniPlayerPanel = miniPlayer
+        applyMiniPartyMode()
         root.addView(miniPlayer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         setContentView(root)
@@ -1380,7 +1381,6 @@ class MainActivity : Activity() {
         }
         val currentId = item?.mediaId ?: ""
         if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
-        applyMiniPartyMode()
         val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
         val widgetPlaying = p?.isPlaying == true
@@ -2358,6 +2358,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         persistPlaybackPosition(force = true)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
+        partyAnimator?.cancel()
         equalizer?.release()
         bassBoost?.release()
         virtualizer?.release()
