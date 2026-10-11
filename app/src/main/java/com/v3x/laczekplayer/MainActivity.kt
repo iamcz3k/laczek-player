@@ -1508,7 +1508,7 @@ class MainActivity : Activity() {
             when (which) {
                 0 -> {
                     val ids = playlistMap[name] ?: emptySet()
-                    val selected = tracks.filter { it.id.toString() in ids }
+                    val selected = ids.mapNotNull { id -> tracks.firstOrNull { it.id.toString() == id } }
                     if (selected.isEmpty()) Toast.makeText(this, "This playlist has no matching local tracks", Toast.LENGTH_SHORT).show() else playTracks(selected)
                 }
                 1 -> reorderPlaylist(name)
@@ -1517,7 +1517,12 @@ class MainActivity : Activity() {
                     val input = EditText(this).apply { setText(name); setTextColor(fg) }
                     AlertDialog.Builder(this).setTitle("Rename playlist").setView(input).setPositiveButton("Save") { _, _ ->
                         val newName = input.text.toString().trim()
-                        if (newName.isNotEmpty() && newName != name) { playlistMap[newName] = playlistMap.remove(name) ?: mutableSetOf(); if (currentPlaylist == name) currentPlaylist = newName; saveLocalSettings(); renderLibrary() }
+                        if (newName.isNotEmpty() && newName != name) {
+                            playlistMap[newName] = playlistMap.remove(name) ?: mutableSetOf()
+                            playlistArtworkUris.remove(name)?.let { playlistArtworkUris[newName] = it }
+                            if (currentPlaylist == name) currentPlaylist = newName
+                            saveLocalSettings(); renderLibrary()
+                        }
                     }.setNegativeButton("Cancel", null).show()
                 }
                 4 -> { pendingExportPlaylist = name; val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "audio/x-mpegurl"; putExtra(Intent.EXTRA_TITLE, name.replace(Regex("[^A-Za-z0-9._ -]"), "_") + ".m3u") }; startActivityForResult(intent, 205) }
