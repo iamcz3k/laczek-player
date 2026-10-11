@@ -1223,7 +1223,7 @@ class MainActivity : Activity() {
                         }
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) }
                             ?: throw IllegalStateException("Could not open export destination")
-                        Toast.makeText(this, "Exported ${filteredTracks().size} tracks to CSV", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Exported " + filteredTracks().size + " tracks to CSV", Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) {
                         Toast.makeText(this, "Library CSV export failed", Toast.LENGTH_LONG).show()
                     }
