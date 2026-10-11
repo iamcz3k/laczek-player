@@ -810,7 +810,7 @@ class MainActivity : Activity() {
         status.text = when {
             tracks.isEmpty() -> "No local music found. Add audio files and tap ⋮ → Rescan library."
             section == "Albums" -> "${visible.map { albumOf(it) }.distinct().size} albums · ${tracks.size} tracks"
-            section == "Artists" -> "${visible.map { artistOf(it) }.distinct().size} artists · ${tracks.size} tracks"
+            section == "Artists" -> "${visible.flatMap { listOf(primaryArtist(it)) + featuredArtists(it) }.distinct().size} artists · ${tracks.size} tracks"
             section == "Folders" -> "${visible.map { it.path }.distinct().size} folders"
             section == "Genres" -> "${visible.map { it.genre }.distinct().size} genres"
             section == "Composers" -> "${visible.map { it.composer.ifBlank { "Unknown composer" } }.distinct().size} composers"
@@ -843,7 +843,7 @@ class MainActivity : Activity() {
         if (section in listOf("Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years", "Formats")) {
             val groups: Map<String, List<Track>> = when (section) {
                 "Albums" -> visible.groupBy { albumOf(it) }
-                "Artists" -> visible.groupBy { artistOf(it) }
+                "Artists" -> visible.flatMap { track -> (listOf(primaryArtist(track)) + featuredArtists(track)).distinct().map { it to track } }.groupBy({ it.first }, { it.second })
                 "Featured artists" -> visible.flatMap { track -> featuredArtists(track).map { it to track } }.groupBy({ it.first }, { it.second })
                 "Genres" -> visible.groupBy { genreOf(it) }
                 "Composers" -> visible.groupBy { it.composer.ifBlank { "Unknown composer" } }
@@ -1705,6 +1705,14 @@ class MainActivity : Activity() {
             controller?.prepare(); controller?.play()
             Toast.makeText(this, "Saved queue restored", Toast.LENGTH_SHORT).show()
         } catch (_: Exception) { Toast.makeText(this, "Could not restore the saved queue", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun primaryArtist(track: Track): String {
+        val artist = artistOf(track)
+        val lower = artist.lowercase(Locale.ROOT)
+        val markers = listOf(" feat. ", " feat ", " ft. ", " ft ", " featuring ")
+        val index = markers.map { lower.indexOf(it) }.filter { it >= 0 }.minOrNull() ?: return artist
+        return artist.substring(0, index).trim().ifBlank { artist }
     }
 
     private fun featuredArtists(track: Track): List<String> {
