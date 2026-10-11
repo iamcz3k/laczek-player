@@ -59,6 +59,18 @@
         android:textSize="18sp" />
 
     <Button
+        android:id="@+id/widget_favorite"
+        android:layout_width="40dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="4dp"
+        android:backgroundTint="#343640"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:text="♡"
+        android:textColor="#FF8A3D"
+        android:textSize="20sp" />
+
+    <Button
         android:id="@+id/widget_next"
         android:layout_width="48dp"
         android:layout_height="48dp"
