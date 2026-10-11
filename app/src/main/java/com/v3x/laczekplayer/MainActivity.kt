@@ -10,6 +10,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.BitmapFactory
+import android.graphics.drawable.GradientDrawable
+import android.animation.ValueAnimator
+import android.animation.ArgbEvaluator
 import android.media.audiofx.Equalizer
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Virtualizer
@@ -56,6 +59,13 @@ class MainActivity : Activity() {
     private val lyricsByTrack = mutableMapOf<String, String>()
     private val trackSpeeds = mutableMapOf<String, Float>()
     private val customArtworkUris = mutableMapOf<String, String>()
+    private val playlistArtworkUris = mutableMapOf<String, String>()
+    private val folderTreeUris = mutableMapOf<String, String>()
+    private var minFileSizeKb = 0L
+    private var minDurationSeconds = 0L
+    private var pendingFolderPath: String? = null
+    private var playlistArtworkTarget: String? = null
+    private var partyAnimator: ValueAnimator? = null
     private var section = "Songs"
     private var query = ""
     private var filterArtist = ""
@@ -128,6 +138,10 @@ class MainActivity : Activity() {
         readStringMap(prefs.getString("lyrics_by_track", "{}"), lyricsByTrack)
         try { val speeds = JSONObject(prefs.getString("track_speeds", "{}")); val keys = speeds.keys(); while (keys.hasNext()) { val key = keys.next(); trackSpeeds[key] = speeds.optDouble(key, 1.0).toFloat().coerceIn(0.25f, 3.0f) } } catch (_: Exception) {}
         readStringMap(prefs.getString("custom_artwork_uris", "{}"), customArtworkUris)
+        readStringMap(prefs.getString("playlist_artwork_uris", "{}"), playlistArtworkUris)
+        readStringMap(prefs.getString("folder_tree_uris", "{}"), folderTreeUris)
+        minFileSizeKb = prefs.getLong("min_file_size_kb", 0L).coerceAtLeast(0L)
+        minDurationSeconds = prefs.getLong("min_duration_seconds", 0L).coerceAtLeast(0L)
         readLongMap(prefs.getString("bookmarks", "{}"), bookmarks)
         readIntMap(prefs.getString("ratings", "{}"), ratings)
         try {
@@ -166,6 +180,10 @@ class MainActivity : Activity() {
             .putString("lyrics_by_track", JSONObject(lyricsByTrack as Map<*, *>).toString())
             .putString("track_speeds", JSONObject(trackSpeeds.mapValues { it.value.toDouble() } as Map<*, *>).toString())
             .putString("custom_artwork_uris", JSONObject(customArtworkUris as Map<*, *>).toString())
+            .putString("playlist_artwork_uris", JSONObject(playlistArtworkUris as Map<*, *>).toString())
+            .putString("folder_tree_uris", JSONObject(folderTreeUris as Map<*, *>).toString())
+            .putLong("min_file_size_kb", minFileSizeKb)
+            .putLong("min_duration_seconds", minDurationSeconds)
             .putString("bookmarks", JSONObject(bookmarks as Map<*, *>).toString())
             .putString("ratings", JSONObject(ratings as Map<*, *>).toString())
             .apply()
@@ -709,13 +727,13 @@ class MainActivity : Activity() {
 
     private fun filteredTracks(): List<Track> {
         var result = tracks.filter { t ->
-            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, genreOf(t), t.composer, yearOf(t).toString(), t.mimeType).any { it.contains(query, true) }
+            val matches = query.isBlank() || listOf(titleOf(t), artistOf(t), albumOf(t), t.path, genreOf(t), t.composer, yearOf(t).toString(), t.mimeType, lyricsByTrack[t.id.toString()] ?: "").any { it.contains(query, true) }
             val advancedMatches = (filterArtist.isBlank() || artistOf(t).contains(filterArtist, true)) &&
                 (filterYear.isBlank() || yearOf(t).toString().contains(filterYear, true)) &&
                 (filterFormat.isBlank() || t.mimeType.substringAfter("/", t.mimeType).contains(filterFormat, true)) &&
                 (filterMinSeconds.isBlank() || t.duration >= (filterMinSeconds.toLongOrNull() ?: 0L) * 1000L) &&
                 (filterMaxSeconds.isBlank() || t.duration <= (filterMaxSeconds.toLongOrNull() ?: Long.MAX_VALUE) * 1000L)
-            !hiddenFolders.contains(t.path) && matches && advancedMatches && when (section) {
+            !hiddenFolders.contains(t.path) && t.sizeBytes >= minFileSizeKb * 1024L && t.duration >= minDurationSeconds * 1000L && matches && advancedMatches && when (section) {
                 "Rated" -> (ratings[t.id.toString()] ?: 0) > 0
                 "Top rated" -> (ratings[t.id.toString()] ?: 0) >= 4
                 "Favorites" -> favorites.contains(t.id.toString())
