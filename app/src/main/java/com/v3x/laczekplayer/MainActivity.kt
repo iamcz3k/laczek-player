@@ -373,6 +373,7 @@ class MainActivity : Activity() {
                 controller?.currentMediaItem?.mediaId?.let { id ->
                     tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) }
                 }
+                Unit
             }
         ).forEach { (label, action) ->
             val button = actionButton(label, action).apply {
