@@ -2142,6 +2142,23 @@ class MainActivity : Activity() {
         val intent = Intent(Intent.ACTION_SEND).apply { type = "audio/*"; putExtra(Intent.EXTRA_STREAM, track.uri); putExtra(Intent.EXTRA_SUBJECT, track.title); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         startActivity(Intent.createChooser(intent, "Share local audio"))
     }
+    private fun reorderPlaylist(name: String) {
+        val ids = (playlistMap[name] ?: emptySet()).toList()
+        val ordered = ids.mapNotNull { id -> tracks.firstOrNull { it.id.toString() == id }?.let { id to titleOf(it) } }.toMutableList()
+        if (ordered.isEmpty()) { Toast.makeText(this, "This playlist has no matching tracks", Toast.LENGTH_SHORT).show(); return }
+        fun display() {
+            AlertDialog.Builder(this).setTitle("Reorder playlist: " + name)
+                .setItems(ordered.mapIndexed { index, item -> (index + 1).toString() + ". " + item.second }.toTypedArray()) { _, index ->
+                    AlertDialog.Builder(this).setTitle(ordered[index].second).setItems(arrayOf("Move up", "Move down")) { _, direction ->
+                        val target = if (direction == 0) index - 1 else index + 1
+                        if (target in ordered.indices) { val item = ordered.removeAt(index); ordered.add(target, item); display() }
+                    }.show()
+                }.setPositiveButton("Save order") { _, _ -> playlistMap[name] = ordered.map { it.first }.toCollection(linkedSetOf()); saveLocalSettings(); renderLibrary() }
+                .setNegativeButton("Cancel", null).show()
+        }
+        display()
+    }
+
     private fun showPlaylistOverview() {
         val msg = if (playlistMap.isEmpty()) "No playlists yet." else playlistMap.entries.joinToString("\n") { "${it.key}: ${it.value.size} tracks" }
         AlertDialog.Builder(this).setTitle("Offline playlists").setMessage(msg)
