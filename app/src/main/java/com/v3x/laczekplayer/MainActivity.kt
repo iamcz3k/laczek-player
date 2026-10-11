@@ -602,11 +602,73 @@ class MainActivity : Activity() {
             songList.addView(listRow("+ Create playlist", "Save selected tracks in a local playlist") { createPlaylist() })
         } else {
             visible.forEach { track ->
-                val row = listRow(titleOf(track), "${artistOf(track)}  ·  ${albumOf(track)}  ·  ${formatTime(track.duration)}") { playTrack(track) }
-                row.setOnLongClickListener { showTrackMenu(track); true }
-                songList.addView(row)
+                songList.addView(trackRow(track))
             }
         }
+    }
+
+    private fun trackRow(track: Track): LinearLayout {
+        val isCurrent = controller?.currentMediaItem?.mediaId == track.id.toString()
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(9), dp(5), dp(9))
+            background = roundedBackground(if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else panel, dp(18))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { playTrack(track) }
+            setOnLongClickListener { showTrackMenu(track); true }
+        }
+        val art = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = roundedBackground(bg, dp(13))
+            clipToOutline = true
+            contentDescription = "Artwork for ${titleOf(track)}"
+            try {
+                val uri = artworkUri(track)
+                if (uri != null) setImageURI(uri)
+            } catch (_: Exception) { setImageDrawable(null) }
+        }
+        row.addView(art, LinearLayout.LayoutParams(dp(52), dp(52)).apply { marginEnd = dp(12) })
+        val labels = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        labels.addView(TextView(this).apply {
+            text = titleOf(track)
+            textSize = 14f
+            setTextColor(if (isCurrent) orange else fg)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        labels.addView(TextView(this).apply {
+            text = "${artistOf(track)}  ·  ${albumOf(track)}"
+            textSize = 11f
+            setTextColor(muted)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding(0, dp(4), 0, 0)
+        })
+        row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(TextView(this).apply {
+            text = formatTime(track.duration)
+            textSize = 10f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            setPadding(dp(4), 0, dp(4), 0)
+        })
+        row.addView(TextView(this).apply {
+            text = "⋮"
+            textSize = 22f
+            setTextColor(muted)
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Options for ${titleOf(track)}"
+            setOnClickListener { showTrackMenu(track) }
+        }, LinearLayout.LayoutParams(dp(34), dp(48)))
+        return row
     }
 
     private fun listRow(title: String, subtitle: String, click: () -> Unit): LinearLayout {
