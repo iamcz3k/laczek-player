@@ -1641,6 +1641,20 @@ class MainActivity : Activity() {
         return tail.split(",", ";", "&", "+", " and ").map { it.trim().trimEnd('.', ',') }.filter { it.isNotBlank() }
     }
 
+    private fun chooseLibraryLimits() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), 0, dp(18), 0) }
+        val size = EditText(this).apply { hint = "Minimum file size in KB (0 = off)"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setText(minFileSizeKb.toString()); setTextColor(fg) }
+        val duration = EditText(this).apply { hint = "Minimum duration in seconds (0 = off)"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setText(minDurationSeconds.toString()); setTextColor(fg) }
+        box.addView(size); box.addView(duration)
+        AlertDialog.Builder(this).setTitle("Library scan filters").setMessage("Tracks below either limit are hidden. Files are never deleted.")
+            .setView(box).setPositiveButton("Apply") { _, _ ->
+                minFileSizeKb = (size.text.toString().toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                minDurationSeconds = (duration.text.toString().toLongOrNull() ?: 0L).coerceAtLeast(0L)
+                saveLocalSettings(); renderLibrary()
+            }.setNeutralButton("Reset") { _, _ -> minFileSizeKb = 0L; minDurationSeconds = 0L; saveLocalSettings(); renderLibrary() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
     private fun chooseSort() {
         val modes = arrayOf("Title", "Artist", "Album", "Duration", "Shortest", "Newest", "Year newest", "Year oldest", "File size", "Rating", "Play count", "Format")
         AlertDialog.Builder(this).setTitle("Sort library").setSingleChoiceItems(modes, modes.indexOf(sortMode).coerceAtLeast(0)) { d, which ->
