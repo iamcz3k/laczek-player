@@ -1211,14 +1211,14 @@ class MainActivity : Activity() {
                 data.data?.let { uri ->
                     try {
                         val body = buildString {
-                            append("Title,Artist,Album,Genre,Composer,Year,Duration_ms,Duration,Format,Size_bytes,Folder,Media_ID\\n")
+                            append("Title,Artist,Album,Genre,Composer,Year,Duration_ms,Duration,Format,Size_bytes,Folder,Media_ID\n")
                             filteredTracks().forEach { track ->
                                 append(listOf(
                                     titleOf(track), artistOf(track), albumOf(track), track.genre,
                                     track.composer, if (track.year > 0) track.year.toString() else "",
                                     track.duration.toString(), formatTime(track.duration), track.mimeType,
                                     track.sizeBytes.toString(), track.path, track.id.toString()
-                                ).joinToString(",") { csvCell(it) }).append('\\n')
+                                ).joinToString(",") { csvCell(it) }).append('\n')
                             }
                         }
                         contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(body) }
