@@ -18,7 +18,7 @@ class SnakeSeekBar @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
     var max: Int = 1000
-        set(value) { field = max(1, value); invalidate() }
+        set(value) { field = kotlin.math.max(1, value); invalidate() }
     var progress: Int = 0
         set(value) { field = value.coerceIn(0, max); invalidate() }
     var trackColor: Int = Color.rgb(65, 67, 76)
