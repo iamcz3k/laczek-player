@@ -679,6 +679,7 @@ class MainActivity : Activity() {
         status.text = "Scanning local music…"
         libraryExecutor.execute {
             val scannedTracks = mutableListOf<Track>()
+            var scanError: String? = null
             try {
                 loadGenreMap()
                 val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
@@ -710,13 +711,14 @@ class MainActivity : Activity() {
                     }
                 }
             } catch (_: Exception) {
-                runOnUiThread { status.text = "Could not scan storage. Check audio permission." }
+                scanError = "Could not scan storage. Check audio permission."
             }
             runOnUiThread {
                 tracks.clear()
                 tracks.addAll(scannedTracks)
                 scanInProgress = false
                 renderLibrary()
+                scanError?.let { status.text = it }
             }
         }
     }
