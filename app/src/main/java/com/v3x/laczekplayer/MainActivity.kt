@@ -317,7 +317,7 @@ class MainActivity : Activity() {
             setOnClickListener { showArtworkPreview() }
         }
         body.addView(artworkView, LinearLayout.LayoutParams(-1, 0).apply {
-            height = dp(300)
+            height = minOf(dp(300), (resources.displayMetrics.heightPixels * 0.36f).toInt())
             width = -1
             bottomMargin = dp(24)
         })
@@ -436,8 +436,8 @@ class MainActivity : Activity() {
         scroll.addView(body)
         screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(screen)
-        screen.alpha = 0.94f; screen.translationY = dp(8).toFloat()
-        screen.animate().alpha(1f).translationY(0f).setDuration(180L).start()
+        screen.alpha = 0.96f; screen.translationY = dp(10).toFloat()
+        screen.animate().alpha(1f).translationY(0f).setDuration(220L).start()
         updatePlaybackUi()
     }
 
@@ -451,25 +451,25 @@ class MainActivity : Activity() {
 
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(10), dp(18), dp(10))
+            setPadding(dp(16), dp(8), dp(16), dp(12))
             setBackgroundColor(bg)
         }
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, dp(14))
+            setPadding(dp(2), dp(8), dp(2), dp(16))
         }
         val brandColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brandColumn.addView(TextView(this).apply {
             text = "LaCzek"
-            textSize = 27f
+            textSize = 30f
             setTextColor(fg)
             setTypeface(null, android.graphics.Typeface.BOLD)
             letterSpacing = -.025f
         })
         brandColumn.addView(TextView(this).apply {
-            text = "YOUR MUSIC, OFFLINE."
+            text = "YOUR MUSIC. YOUR RULES."
             textSize = 10f
             letterSpacing = .16f
             setTextColor(muted)
@@ -495,8 +495,10 @@ class MainActivity : Activity() {
             isSingleLine = true
             setTextColor(fg)
             setHintTextColor(muted)
-            setPadding(dp(16), 0, dp(16), 0)
-            background = roundedBackground(panel, dp(17))
+            setPadding(dp(17), 0, dp(17), 0)
+            background = roundedBackground(panel, dp(18))
+            backgroundTintList = null
+            minHeight = dp(52)
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             addTextChangedListener(SimpleTextWatcher { query = it.trim(); renderLibrary() })
         }
@@ -512,7 +514,7 @@ class MainActivity : Activity() {
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(12))
+            setPadding(0, dp(2), 0, dp(14))
         }
         listOf("Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years",
             "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
@@ -557,9 +559,9 @@ class MainActivity : Activity() {
         val miniPlayer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(9), dp(10), dp(9))
-            background = roundedBackground(panel, dp(20))
-            elevation = dp(3).toFloat()
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = roundedBackground(if (dark) Color.rgb(18, 18, 18) else panel, dp(22))
+            elevation = dp(5).toFloat()
             visibility = View.GONE
             isClickable = true
             isFocusable = true
@@ -613,8 +615,8 @@ class MainActivity : Activity() {
         root.addView(miniPlayer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         setContentView(root)
-        root.alpha = 0.94f; root.translationY = dp(8).toFloat()
-        root.animate().alpha(1f).translationY(0f).setDuration(180L).start()
+        root.alpha = 0.96f; root.translationY = dp(10).toFloat()
+        root.animate().alpha(1f).translationY(0f).setDuration(220L).start()
         uiTicker?.let { uiHandler.removeCallbacks(it) }
         abTicker?.let { uiHandler.removeCallbacks(it) }
         uiTicker = object : Runnable {
@@ -905,8 +907,8 @@ class MainActivity : Activity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(10), dp(9), dp(5), dp(9))
-            background = roundedBackground(if (track.id.toString() in selectedTrackIds) Color.argb(if (dark) 65 else 45, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else panel, dp(18))
+            setPadding(dp(10), dp(10), dp(6), dp(10))
+            background = roundedBackground(if (track.id.toString() in selectedTrackIds) Color.argb(if (dark) 65 else 45, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (dark) Color.rgb(15, 15, 15) else panel, dp(20))
             isClickable = true
             isFocusable = true
             setOnClickListener { if (selectionMode) toggleTrackSelection(track) else playTrack(track) }
@@ -922,14 +924,14 @@ class MainActivity : Activity() {
                 if (uri != null) setImageURI(uri)
             } catch (_: Exception) { setImageDrawable(null) }
         }
-        row.addView(art, LinearLayout.LayoutParams(dp(52), dp(52)).apply { marginEnd = dp(12) })
+        row.addView(art, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(13) })
         val labels = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
         }
         labels.addView(TextView(this).apply {
             text = titleOf(track)
-            textSize = 14f
+            textSize = 14.5f
             setTextColor(if (isCurrent) orange else fg)
             setTypeface(null, android.graphics.Typeface.BOLD)
             maxLines = 1
@@ -969,7 +971,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(10), dp(10), dp(10))
-            background = roundedBackground(panel, dp(18))
+            background = roundedBackground(if (dark) Color.rgb(15, 15, 15) else panel, dp(20))
             isClickable = true
             isFocusable = true
             setOnClickListener { click() }
