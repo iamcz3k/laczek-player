@@ -116,6 +116,10 @@ class MainActivity : Activity() {
     private var lastMiniArtworkTrackId = ""
     private var lastPlayerArtworkTrackId = ""
     private var artworkBreathAnimator: ValueAnimator? = null
+    private var cdDisc: View? = null
+    private var cdRotation: android.view.animation.Animation? = null
+    private val artworkExecutor = Executors.newSingleThreadExecutor()
+    private var pendingDeleteIds: Set<String> = emptySet()
     private var accentColor = Color.rgb(255, 210, 31)
     private val orange get() = accentColor
     private val brutalYellow = Color.rgb(255, 210, 31)
@@ -143,9 +147,15 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
         val migratedNeoBrutal = prefs.getBoolean("neo_brutal_migrated", false)
-        dark = if (migratedNeoBrutal) prefs.getBoolean("dark", false) else false
+        val amoledDefaultApplied = prefs.getBoolean("amoled_default_applied", false)
+        dark = if (migratedNeoBrutal) prefs.getBoolean("dark", true) else true
         accentColor = if (migratedNeoBrutal) prefs.getInt("accent", brutalYellow) else brutalYellow
-        if (!migratedNeoBrutal) prefs.edit().putBoolean("neo_brutal_migrated", true).putBoolean("dark", false).putInt("accent", brutalYellow).apply()
+        if (!migratedNeoBrutal) prefs.edit().putBoolean("neo_brutal_migrated", true).putBoolean("dark", true).putInt("accent", brutalYellow).apply()
+        if (!amoledDefaultApplied) {
+            dark = true
+            accentColor = brutalYellow
+            prefs.edit().putBoolean("amoled_default_applied", true).putBoolean("dark", true).putInt("accent", brutalYellow).apply()
+        }
         hiddenFolders.addAll(prefs.getStringSet("hidden_folders", emptySet()) ?: emptySet())
         sortMode = prefs.getString("sort", "Title") ?: "Title"
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
@@ -322,133 +332,108 @@ class MainActivity : Activity() {
         })
         screen.addView(top)
 
-        val scroll = ScrollView(this).apply { isFillViewport = true; clipToPadding = false }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, dp(8))
+            setPadding(0, dp(2), 0, dp(2))
+        }
+        val discSize = minOf(dp(224), (resources.displayMetrics.heightPixels * 0.285f).toInt())
+        val disc = FrameLayout(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(24, 25, 28)); setStroke(dp(1), Color.rgb(62, 64, 69)) }
+            elevation = dp(4).toFloat()
+            contentDescription = "Spinning CD. Drag the progress slider to seek."
+        }
+        for (diameter in listOf(0.88f, 0.72f, 0.56f)) {
+            disc.addView(View(this).apply {
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.TRANSPARENT); setStroke(dp(1), Color.rgb(48, 50, 54)) }
+            }, FrameLayout.LayoutParams((discSize * diameter).toInt(), (discSize * diameter).toInt(), Gravity.CENTER))
         }
         artworkView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = if (dark) roundedBackground(panel, dp(28)) else brutalCardBackground(brutalCream, 28)
-            elevation = if (dark) 0f else dp(6).toFloat()
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(37, 38, 42)); setStroke(dp(2), Color.rgb(190, 192, 198)) }
             clipToOutline = true
-            contentDescription = "Album artwork"
+            contentDescription = "Album cover in the center of the CD"
             setOnClickListener { showArtworkPreview() }
         }
-        body.addView(artworkView, LinearLayout.LayoutParams(-1, 0).apply {
-            height = minOf(dp(300), (resources.displayMetrics.heightPixels * 0.36f).toInt())
-            width = -1
-            bottomMargin = dp(24)
-        })
+        disc.addView(artworkView, FrameLayout.LayoutParams((discSize * 0.43f).toInt(), (discSize * 0.43f).toInt(), Gravity.CENTER))
+        disc.addView(View(this).apply {
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.rgb(10, 10, 11)); setStroke(dp(1), Color.rgb(120, 122, 127)) }
+        }, FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER))
+        cdDisc = disc
+        cdRotation = android.view.animation.RotateAnimation(0f, 360f,
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f).apply {
+            duration = 9000L
+            repeatCount = android.view.animation.Animation.INFINITE
+            interpolator = android.view.animation.LinearInterpolator()
+            fillAfter = true
+        }
+        body.addView(disc, LinearLayout.LayoutParams(discSize, discSize).apply { bottomMargin = dp(8) })
         nowPlaying = TextView(this).apply {
-            text = ""
-            textSize = 25f
-            setTextColor(fg)
-            if (!dark) setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
-            gravity = Gravity.CENTER
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
+            text = item.mediaMetadata.title?.toString() ?: "Unknown title"
+            textSize = 21f; setTextColor(fg); setTypeface(null, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }
         body.addView(nowPlaying, LinearLayout.LayoutParams(-1, -2))
         body.addView(TextView(this).apply {
             text = item.mediaMetadata.artist?.toString() ?: "Unknown artist"
-            textSize = 14f
-            setTextColor(muted)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(7), 0, dp(3))
+            textSize = 13f; setTextColor(muted); gravity = Gravity.CENTER; maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END; setPadding(0, dp(2), 0, dp(2))
         }, LinearLayout.LayoutParams(-1, -2))
-        val albumText = TextView(this).apply {
-            text = item.mediaMetadata.albumTitle?.toString() ?: "Local audio"
-            textSize = 12f
-            setTextColor(muted)
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, dp(10))
-        }
-        body.addView(albumText)
-
         seek = SnakeSeekBar(this).apply {
-            max = 1000
-            progressColor = if (dark) orange else brutalPink
-            trackColor = if (dark) Color.rgb(65, 67, 76) else brutalBlack
-            contentDescription = "Song playback progress. Drag to seek."
-            onProgressChanged = { value, fromUser ->
-                if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
-            }
+            max = 1000; progressColor = brutalYellow; trackColor = Color.rgb(55, 57, 62)
+            contentDescription = "Song playback progress. Drag to seek to any timestamp."
+            onProgressChanged = { value, fromUser -> if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) } }
         }
-        body.addView(seek, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(10) })
-        timeText = TextView(this).apply {
-            textSize = 11f
-            setTextColor(muted)
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        body.addView(timeText, LinearLayout.LayoutParams(-1, dp(20)))
-        addClickWheel(body)
-        val toolGrid = GridLayout(this).apply {
-            columnCount = 3
-            rowCount = 3
-            useDefaultMargins = false
-        }
-        listOf(
-            "Shuffle" to { toggleShuffle() },
-            "Repeat" to { cycleRepeat() },
-            "Queue" to { showQueue() },
-            "Lyrics" to { showLyrics() },
-            "Speed" to { setPlaybackSpeed() },
-            "A-B repeat" to { toggleABRepeat() },
-            "Equalizer" to { showEqualizer() },
-            "Favorite" to {
-                controller?.currentMediaItem?.mediaId?.let { id ->
-                    if (!favorites.add(id)) favorites.remove(id)
-                    saveLocalSettings()
-                    renderLibrary()
-                    Toast.makeText(this, if (favorites.contains(id)) "Added to favorites" else "Removed from favorites", Toast.LENGTH_SHORT).show()
-                }
-                Unit
-            },
-            "Sleep timer" to { setSleepTimer() },
-            "Artwork" to { showArtworkPreview() },
-            "Track info" to {
-                controller?.currentMediaItem?.mediaId?.let { id ->
-                    tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) }
-                }
-                Unit
+        body.addView(seek, LinearLayout.LayoutParams(-1, dp(34)).apply { topMargin = dp(1) })
+        timeText = TextView(this).apply { textSize = 11f; setTextColor(muted); gravity = Gravity.CENTER }
+        body.addView(timeText, LinearLayout.LayoutParams(-1, dp(17)))
+        val transport = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(0, dp(3), 0, dp(3)) }
+        fun transportButton(symbol: String, description: String, action: () -> Unit, primary: Boolean = false): Button =
+            actionButton(symbol, action).apply {
+                textSize = if (primary) 22f else 19f; contentDescription = description
+                background = roundedBackground(if (primary) brutalYellow else panel, dp(20))
+                setTextColor(if (primary) Color.BLACK else fg)
+                minWidth = if (primary) dp(62) else dp(52); minimumWidth = minWidth
+                minHeight = dp(44); minimumHeight = dp(44); setPadding(0, 0, 0, 0)
             }
-        ).forEach { (label, action) ->
-            val button = actionButton(label, action).apply {
-                textSize = 12f
-                background = roundedBackground(panel, dp(15))
-                setPadding(dp(6), 0, dp(6), 0)
-                minHeight = dp(46); minimumHeight = dp(46)
+        transport.addView(transportButton("⏮", "Previous track", { skip(-1) }), LinearLayout.LayoutParams(dp(56), dp(44)).apply { marginEnd = dp(10) })
+        playButton = transportButton("▶", "Play or pause", { togglePlayback() }, true)
+        transport.addView(playButton, LinearLayout.LayoutParams(dp(66), dp(44)))
+        transport.addView(transportButton("⏭", "Next track", { skip(1) }), LinearLayout.LayoutParams(dp(56), dp(44)).apply { marginStart = dp(10) })
+        body.addView(transport, LinearLayout.LayoutParams(-1, -2))
+        val toolGrid = GridLayout(this).apply { columnCount = 4; useDefaultMargins = false }
+        val tools = listOf(
+            Triple("♡", "Favorite", { toggleCurrentFavorite() }),
+            Triple("♫", "Lyrics", { showLyrics() }),
+            Triple("≡", "Queue", { showQueue() }),
+            Triple("⤨", "Shuffle", { toggleShuffle() }),
+            Triple("↻", "Repeat", { cycleRepeat() }),
+            Triple("1×", "Speed", { setPlaybackSpeed() }),
+            Triple("A-B", "A-B repeat", { toggleABRepeat() }),
+            Triple("EQ", "Equalizer", { showEqualizer() }),
+            Triple("◷", "Sleep timer", { setSleepTimer() }),
+            Triple("◉", "Artwork", { showArtworkPreview() }),
+            Triple("⋯", "More track tools", { showCurrentTrackMenu() })
+        )
+        tools.forEach { (symbol, label, action) ->
+            val button = actionButton(symbol, action).apply {
+                textSize = 18f; contentDescription = label; background = roundedBackground(panel, dp(12))
+                setTextColor(if (label == "Favorite" && (controller?.currentMediaItem?.mediaId?.let { it in favorites } == true)) brutalYellow else fg)
+                minHeight = dp(36); minimumHeight = dp(36); setPadding(0, 0, 0, 0)
             }
-            val params = GridLayout.LayoutParams().apply {
-                width = 0
-                height = dp(46)
-                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                setMargins(dp(4), dp(4), dp(4), dp(4))
-            }
-            toolGrid.addView(button, params)
+            toolGrid.addView(button, GridLayout.LayoutParams().apply {
+                width = 0; height = dp(36); columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                setMargins(dp(3), dp(3), dp(3), dp(3))
+            })
         }
-        body.addView(toolGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        scroll.addView(body)
-        screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        body.addView(toolGrid, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(1) })
+        screen.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(screen)
-        artworkBreathAnimator?.cancel()
-        artworkBreathAnimator = ValueAnimator.ofFloat(1f, 1.018f).apply {
-            duration = 1600L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = android.view.animation.DecelerateInterpolator()
-            addUpdateListener {
-                if (fullPlayerOpen && ::artworkView.isInitialized) {
-                    val scale = it.animatedValue as Float
-                    artworkView.scaleX = scale; artworkView.scaleY = scale
-                }
-            }
-            start()
-        }
-        screen.alpha = 0.96f; screen.translationY = dp(10).toFloat()
+                artworkBreathAnimator?.cancel()
+        artworkBreathAnimator = null
+        if (controller?.isPlaying == true) cdDisc?.startAnimation(cdRotation)
+        screen.alpha = 0.98f; screen.translationY = dp(6).toFloat()
         screen.animate().alpha(1f).translationY(0f).setDuration(220L).start()
         updatePlaybackUi()
     }
@@ -1072,7 +1057,7 @@ class MainActivity : Activity() {
         if (section == "Songs" && !selectionMode && query.isBlank()) addHomeCollections()
         if (selectionMode) {
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(4), 0, dp(10)) }
-            listOf("Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "Playlist" to { playlistSelectedTracks() }, "Clear" to { selectedTrackIds.clear(); renderLibrary() }).forEach { (label, action) ->
+            listOf("Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "Playlist" to { playlistSelectedTracks() }, "Share" to { shareSelectedTracks() }, "Delete" to { deleteSelectedTracks() }, "Clear" to { selectedTrackIds.clear(); renderLibrary() }).forEach { (label, action) ->
                 actions.addView(actionButton(label, action).apply { textSize = 11f; background = roundedBackground(panel, dp(14)); minHeight = dp(42); minimumHeight = dp(42) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) })
             }
             songList.addView(TextView(this).apply { text = "${selectedTrackIds.size} selected · tap songs to select"; setTextColor(orange); textSize = 12f; setPadding(dp(2), dp(4), 0, dp(7)) })
@@ -1651,6 +1636,36 @@ class MainActivity : Activity() {
             .apply()
     }
 
+    private fun toggleCurrentFavorite() {
+        controller?.currentMediaItem?.mediaId?.let { id ->
+            if (!favorites.add(id)) favorites.remove(id)
+            saveLocalSettings()
+            Toast.makeText(this, if (favorites.contains(id)) "Added to favorites" else "Removed from favorites", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showCurrentTrackMenu() {
+        controller?.currentMediaItem?.mediaId?.let { id -> tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) } }
+    }
+
+    private fun loadArtworkAsync(track: Track?, target: ImageView, mediaId: String) {
+        val requestKey = "artwork:$mediaId"
+        target.tag = requestKey
+        if (track == null) { target.setImageDrawable(null); return }
+        val uri = try { artworkUri(track) } catch (_: Exception) { null }
+        if (uri == null) { target.setImageDrawable(null); return }
+        artworkExecutor.execute {
+            val bitmap = try {
+                contentResolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply { inSampleSize = 2 }) }
+            } catch (_: Exception) { null }
+            runOnUiThread {
+                if (target.tag == requestKey) {
+                    if (bitmap != null) target.setImageBitmap(bitmap) else target.setImageDrawable(null)
+                } else bitmap?.recycle()
+            }
+        }
+    }
+
     private fun updatePlaybackUi() {
         val p = controller
         val item = p?.currentMediaItem
@@ -1663,14 +1678,15 @@ class MainActivity : Activity() {
             val miniId = item?.mediaId ?: ""
             if (miniId != lastMiniArtworkTrackId) {
                 lastMiniArtworkTrackId = miniId
-                try {
-                    val track = tracks.firstOrNull { it.id.toString() == miniId }
-                    val art = track?.let { artworkUri(it) }
-                    if (art != null) miniArtwork.setImageURI(art) else miniArtwork.setImageDrawable(null)
-                } catch (_: Exception) { miniArtwork.setImageDrawable(null) }
+                loadArtworkAsync(tracks.firstOrNull { it.id.toString() == miniId }, miniArtwork, miniId)
             }
         }
         val currentId = item?.mediaId ?: ""
+        if (fullPlayerOpen) {
+            if (widgetPlaying) {
+                if (cdDisc?.animation == null) cdDisc?.startAnimation(cdRotation)
+            } else cdDisc?.clearAnimation()
+        }
         if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
         val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
@@ -1688,15 +1704,7 @@ class MainActivity : Activity() {
         val playerTrackId = item?.mediaId ?: ""
         if (playerTrackId != lastPlayerArtworkTrackId) {
             lastPlayerArtworkTrackId = playerTrackId
-            artworkView.animate().cancel()
-            artworkView.animate().alpha(.35f).setDuration(100L).withEndAction {
-                val currentTrack = tracks.firstOrNull { it.id.toString() == playerTrackId }
-                try {
-                    val art = currentTrack?.let { artworkUri(it) }
-                    if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null)
-                } catch (_: Exception) { artworkView.setImageDrawable(null) }
-                artworkView.animate().alpha(1f).setDuration(150L).start()
-            }.start()
+            loadArtworkAsync(tracks.firstOrNull { it.id.toString() == playerTrackId }, artworkView, playerTrackId)
         }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
         val position = p?.currentPosition?.coerceAtLeast(0) ?: 0L
@@ -1861,7 +1869,7 @@ class MainActivity : Activity() {
         val artworkColors = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("artwork_colors", true)
         val skipSilence = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("skip_silence_enabled", false)
         val partyMode = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("mini_party_mode", false)
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Matte AMOLED" else "Yellow"}, choose theme", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
         showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
             when (which) {
                 0 -> scanLibrary()
@@ -1870,7 +1878,7 @@ class MainActivity : Activity() {
                 3 -> importAudio()
                 4 -> importM3u()
                 5 -> setSleepTimer()
-                6 -> { dark = !dark; saveLocalSettings(); rebuildUi() }
+                6 -> chooseTheme()
                 7 -> exportBackup()
                 8 -> importBackup()
                 9 -> clearListeningHistory()
@@ -2226,6 +2234,18 @@ class MainActivity : Activity() {
     }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 207) {
+            if (resultCode == RESULT_OK) {
+                forgetDeletedTracks(pendingDeleteIds)
+                Toast.makeText(this, "Deletion confirmed", Toast.LENGTH_SHORT).show()
+                pendingDeleteIds = emptySet()
+                scanLibrary()
+            } else {
+                pendingDeleteIds = emptySet()
+                Toast.makeText(this, "Deletion cancelled", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
         if (resultCode != RESULT_OK || data == null) return
         when (requestCode) {
             201 -> {
@@ -2504,16 +2524,9 @@ class MainActivity : Activity() {
     }
 
     private fun deleteTrack(track: Track) {
-        try {
-            if (Build.VERSION.SDK_INT >= 30) {
-                val request = MediaStore.createDeleteRequest(contentResolver, listOf(track.uri))
-                startIntentSenderForResult(request.intentSender, 207, null, 0, 0, 0)
-            } else {
-                val deleted = contentResolver.delete(track.uri, null, null)
-                if (deleted > 0) { Toast.makeText(this, "File deleted", Toast.LENGTH_SHORT).show(); scanLibrary() }
-                else Toast.makeText(this, "Android did not delete this file", Toast.LENGTH_LONG).show()
-            }
-        } catch (_: Exception) { Toast.makeText(this, "Deletion was denied or unsupported by this device", Toast.LENGTH_LONG).show() }
+        AlertDialog.Builder(this).setTitle("Delete audio file?")
+            .setMessage("This deletes the actual local file. Android may ask for confirmation.")
+            .setNegativeButton("Cancel", null).setPositiveButton("Delete") { _, _ -> deleteTracks(listOf(track)) }.show()
     }
 
     private fun fileNameOf(track: Track): String {
@@ -2614,6 +2627,59 @@ class MainActivity : Activity() {
         Toast.makeText(this, if (remove) "Removed ${ids.size} favourites" else "Added ${ids.size} favourites", Toast.LENGTH_SHORT).show()
     }
 
+    private fun shareSelectedTracks() {
+        val chosen = selectedTracks()
+        if (chosen.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
+        try {
+            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "audio/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(chosen.map { it.uri }))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Share selected audio"))
+        } catch (_: Exception) { Toast.makeText(this, "Could not share these audio files", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun deleteSelectedTracks() {
+        val chosen = selectedTracks()
+        if (chosen.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
+        AlertDialog.Builder(this).setTitle("Delete ${chosen.size} audio files?")
+            .setMessage("Android may ask you to confirm deletion. This removes the actual local files, not just the library entries.")
+            .setNegativeButton("Cancel", null).setPositiveButton("Delete") { _, _ -> deleteTracks(chosen) }.show()
+    }
+
+    private fun deleteTracks(chosen: List<Track>) {
+        pendingDeleteIds = chosen.map { it.id.toString() }.toSet()
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                val request = MediaStore.createDeleteRequest(contentResolver, chosen.map { it.uri })
+                startIntentSenderForResult(request.intentSender, 207, null, 0, 0, 0)
+            } else {
+                var deleted = 0
+                chosen.forEach { track -> try { if (contentResolver.delete(track.uri, null, null) > 0) deleted++ } catch (_: Exception) {} }
+                if (deleted > 0) {
+                    forgetDeletedTracks(pendingDeleteIds)
+                    Toast.makeText(this, "Deleted $deleted audio files", Toast.LENGTH_SHORT).show()
+                    pendingDeleteIds = emptySet(); scanLibrary()
+                } else { pendingDeleteIds = emptySet(); Toast.makeText(this, "Android could not delete the selected files", Toast.LENGTH_LONG).show() }
+            }
+        } catch (_: Exception) {
+            pendingDeleteIds = emptySet()
+            Toast.makeText(this, "Deletion was denied or unsupported by this device", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun forgetDeletedTracks(ids: Set<String>) {
+        favorites.removeAll(ids); selectedTrackIds.removeAll(ids)
+        playlistMap.values.forEach { it.removeAll(ids) }
+        ids.forEach { id ->
+            ratings.remove(id); bookmarks.remove(id); customTitles.remove(id); customArtists.remove(id)
+            customAlbums.remove(id); customGenres.remove(id); customYears.remove(id); lyricsByTrack.remove(id)
+            trackSpeeds.remove(id); customArtworkUris.remove(id)
+        }
+        saveLocalSettings()
+    }
+
     private fun playlistSelectedTracks() {
         val ids = selectedTrackIds.toSet()
         if (ids.isEmpty()) { Toast.makeText(this, "Select tracks first", Toast.LENGTH_SHORT).show(); return }
@@ -2651,31 +2717,49 @@ class MainActivity : Activity() {
 
     private fun updateArtworkAccent(track: Track) {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
-        if (!prefs.getBoolean("artwork_colors", true)) return
+        if (!prefs.getBoolean("artwork_colors", false)) return
         val key = track.id.toString()
         if (key == lastAccentTrackId) return
         lastAccentTrackId = key
         val uri = artworkUri(track) ?: return
-        try {
-            val bitmap = contentResolver.openInputStream(uri)?.use { input ->
-                BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply { inSampleSize = 8 })
-            } ?: return
-            var red = 0L; var green = 0L; var blue = 0L; var count = 0L
-            val stepX = (bitmap.width / 24).coerceAtLeast(1); val stepY = (bitmap.height / 24).coerceAtLeast(1)
-            for (y in 0 until bitmap.height step stepY) for (x in 0 until bitmap.width step stepX) {
-                val pixel = bitmap.getPixel(x, y); red += Color.red(pixel); green += Color.green(pixel); blue += Color.blue(pixel); count++
-            }
-            bitmap.recycle()
-            if (count > 0) {
-                var r = (red / count).toInt(); var g = (green / count).toInt(); var b = (blue / count).toInt()
-                if (maxOf(r, g, b) - minOf(r, g, b) < 22) { r = 255; g = 138; b = 61 }
-                else if (maxOf(r, g, b) < 105) { r = (r + 65).coerceAtMost(255); g = (g + 65).coerceAtMost(255); b = (b + 65).coerceAtMost(255) }
-                accentColor = Color.rgb(r, g, b)
+        artworkExecutor.execute {
+            val sampledColor = try {
+                val bitmap = contentResolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply { inSampleSize = 8 }) } ?: return@execute
+                var red = 0L; var green = 0L; var blue = 0L; var count = 0L
+                val stepX = (bitmap.width / 24).coerceAtLeast(1); val stepY = (bitmap.height / 24).coerceAtLeast(1)
+                for (y in 0 until bitmap.height step stepY) for (x in 0 until bitmap.width step stepX) {
+                    val pixel = bitmap.getPixel(x, y); red += Color.red(pixel); green += Color.green(pixel); blue += Color.blue(pixel); count++
+                }
+                bitmap.recycle()
+                if (count == 0L) null else {
+                    var r = (red / count).toInt(); var g = (green / count).toInt(); var b = (blue / count).toInt()
+                    if (maxOf(r, g, b) - minOf(r, g, b) < 22) { r = 255; g = 210; b = 31 }
+                    else if (maxOf(r, g, b) < 105) { r = (r + 65).coerceAtMost(255); g = (g + 65).coerceAtMost(255); b = (b + 65).coerceAtMost(255) }
+                    Color.rgb(r, g, b)
+                }
+            } catch (_: Exception) { null }
+            if (sampledColor != null) runOnUiThread {
+                if (controller?.currentMediaItem?.mediaId != key) return@runOnUiThread
+                accentColor = sampledColor
                 if (::seek.isInitialized) { seek.progressColor = orange; seek.invalidate() }
                 if (::playButton.isInitialized) playButton.background = roundedBackground(orange, dp(25))
                 if (::miniPlayButton.isInitialized) miniPlayButton.setTextColor(orange)
             }
-        } catch (_: Exception) {}
+        }
+    }
+
+    private fun chooseTheme() {
+        val options = arrayOf("Matte AMOLED dark (default)", "Yellow neo-brutal")
+        AlertDialog.Builder(this).setTitle("Choose appearance")
+            .setSingleChoiceItems(options, if (dark) 0 else 1) { dialog, which ->
+                dark = which == 0
+                accentColor = brutalYellow
+                getSharedPreferences("laczek_player", MODE_PRIVATE).edit()
+                    .putBoolean("dark", dark).putInt("accent", brutalYellow).putBoolean("amoled_default_applied", true).apply()
+                dialog.dismiss()
+                lastAccentTrackId = ""
+                rebuildUi()
+            }.setNegativeButton("Cancel", null).show()
     }
 
     private fun rebuildUi() {
