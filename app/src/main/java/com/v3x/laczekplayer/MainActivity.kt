@@ -1682,12 +1682,12 @@ class MainActivity : Activity() {
             !::artworkView.isInitialized || !::seek.isInitialized || !::timeText.isInitialized) return
         nowPlaying.text = item?.mediaMetadata?.title?.toString() ?: "Unknown title"
         playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
-        val currentId = item?.mediaId ?: ""
-        if (currentId != lastPlayerArtworkTrackId) {
-            lastPlayerArtworkTrackId = currentId
+        val playerTrackId = item?.mediaId ?: ""
+        if (playerTrackId != lastPlayerArtworkTrackId) {
+            lastPlayerArtworkTrackId = playerTrackId
             artworkView.animate().cancel()
             artworkView.animate().alpha(.35f).setDuration(100L).withEndAction {
-                val currentTrack = tracks.firstOrNull { it.id.toString() == currentId }
+                val currentTrack = tracks.firstOrNull { it.id.toString() == playerTrackId }
                 try {
                     val art = currentTrack?.let { artworkUri(it) }
                     if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null)
