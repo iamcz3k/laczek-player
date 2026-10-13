@@ -113,6 +113,9 @@ class MainActivity : Activity() {
     private lateinit var miniArtistLabel: TextView
     private lateinit var miniPlayButton: Button
     private var fullPlayerOpen = false
+    private var lastMiniArtworkTrackId = ""
+    private var lastPlayerArtworkTrackId = ""
+    private var artworkBreathAnimator: ValueAnimator? = null
     private var accentColor = Color.rgb(255, 210, 31)
     private val orange get() = accentColor
     private val brutalYellow = Color.rgb(255, 210, 31)
@@ -243,6 +246,9 @@ class MainActivity : Activity() {
 
     private fun showLibraryScreen() {
         fullPlayerOpen = false
+        artworkBreathAnimator?.cancel()
+        artworkBreathAnimator = null
+        lastPlayerArtworkTrackId = ""
         buildUi()
         renderLibrary()
         updatePlaybackUi()
@@ -425,6 +431,20 @@ class MainActivity : Activity() {
         scroll.addView(body)
         screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(screen)
+        artworkBreathAnimator?.cancel()
+        artworkBreathAnimator = ValueAnimator.ofFloat(1f, 1.018f).apply {
+            duration = 1600L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener {
+                if (fullPlayerOpen && ::artworkView.isInitialized) {
+                    val scale = it.animatedValue as Float
+                    artworkView.scaleX = scale; artworkView.scaleY = scale
+                }
+            }
+            start()
+        }
         screen.alpha = 0.96f; screen.translationY = dp(10).toFloat()
         screen.animate().alpha(1f).translationY(0f).setDuration(220L).start()
         updatePlaybackUi()
@@ -537,6 +557,17 @@ class MainActivity : Activity() {
             if (selectionMode) { section = "Songs"; currentPlaylist = null } else selectedTrackIds.clear()
             renderLibrary(); buildUiSelectionRefresh()
         }.apply { textSize = 12f; setPadding(dp(7), 0, dp(7), 0); minWidth = dp(58); minimumWidth = dp(58); minHeight = dp(44); minimumHeight = dp(44); background = roundedBackground(panel, dp(14)) })
+        header.addView(actionButton("▣") {
+            section = "Folders"; currentPlaylist = null; query = ""
+            search.setText("")
+            renderLibrary()
+        }.apply {
+            textSize = 18f
+            background = roundedBackground(panel, dp(16))
+            minWidth = dp(46); minimumWidth = dp(46)
+            minHeight = dp(48); minimumHeight = dp(48)
+            contentDescription = "Browse folders"
+        })
         header.addView(actionButton("⚙") { showMoreMenu() }.apply {
             textSize = 20f
             background = roundedBackground(panel, dp(16))
@@ -1626,11 +1657,15 @@ class MainActivity : Activity() {
             miniTrackLabel.text = item?.mediaMetadata?.title?.toString() ?: ""
             miniArtistLabel.text = item?.mediaMetadata?.artist?.toString() ?: ""
             miniPlayButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
-            try {
-                val track = tracks.firstOrNull { it.id.toString() == item?.mediaId }
-                val art = track?.let { artworkUri(it) }
-                if (art != null) miniArtwork.setImageURI(art) else miniArtwork.setImageDrawable(null)
-            } catch (_: Exception) { miniArtwork.setImageDrawable(null) }
+            val miniId = item?.mediaId ?: ""
+            if (miniId != lastMiniArtworkTrackId) {
+                lastMiniArtworkTrackId = miniId
+                try {
+                    val track = tracks.firstOrNull { it.id.toString() == miniId }
+                    val art = track?.let { artworkUri(it) }
+                    if (art != null) miniArtwork.setImageURI(art) else miniArtwork.setImageDrawable(null)
+                } catch (_: Exception) { miniArtwork.setImageDrawable(null) }
+            }
         }
         val currentId = item?.mediaId ?: ""
         if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
@@ -1647,8 +1682,19 @@ class MainActivity : Activity() {
             !::artworkView.isInitialized || !::seek.isInitialized || !::timeText.isInitialized) return
         nowPlaying.text = item?.mediaMetadata?.title?.toString() ?: "Unknown title"
         playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
-        val currentTrack = tracks.firstOrNull { it.id.toString() == item?.mediaId }
-        try { val art = currentTrack?.let { artworkUri(it) }; if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null) } catch (_: Exception) { artworkView.setImageDrawable(null) }
+        val currentId = item?.mediaId ?: ""
+        if (currentId != lastPlayerArtworkTrackId) {
+            lastPlayerArtworkTrackId = currentId
+            artworkView.animate().cancel()
+            artworkView.animate().alpha(.35f).setDuration(100L).withEndAction {
+                val currentTrack = tracks.firstOrNull { it.id.toString() == currentId }
+                try {
+                    val art = currentTrack?.let { artworkUri(it) }
+                    if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null)
+                } catch (_: Exception) { artworkView.setImageDrawable(null) }
+                artworkView.animate().alpha(1f).setDuration(150L).start()
+            }.start()
+        }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
         val position = p?.currentPosition?.coerceAtLeast(0) ?: 0L
         seek.progress = if (duration > 0) (position * 1000 / duration).toInt() else 0
@@ -2656,6 +2702,7 @@ class MainActivity : Activity() {
         persistPlaybackPosition(force = true)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
         partyAnimator?.cancel()
+        artworkBreathAnimator?.cancel()
         equalizer?.release()
         bassBoost?.release()
         virtualizer?.release()
