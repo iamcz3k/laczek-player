@@ -248,6 +248,9 @@ class MainActivity : Activity() {
         fullPlayerOpen = false
         artworkBreathAnimator?.cancel()
         artworkBreathAnimator = null
+        cdDisc?.clearAnimation()
+        cdDisc = null
+        cdRotation = null
         lastPlayerArtworkTrackId = ""
         buildUi()
         renderLibrary()
@@ -2701,6 +2704,8 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         persistPlaybackPosition(force = true)
         uiTicker?.let { uiHandler.removeCallbacks(it) }
+        cdDisc?.clearAnimation()
+        artworkExecutor.shutdownNow()
         partyAnimator?.cancel()
         artworkBreathAnimator?.cancel()
         equalizer?.release()
