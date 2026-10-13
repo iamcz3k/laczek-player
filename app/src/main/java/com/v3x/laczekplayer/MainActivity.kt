@@ -441,11 +441,18 @@ class MainActivity : Activity() {
             elevation = dp(8).toFloat()
             contentDescription = "iPod-style playback wheel"
         }
-        fun wheelButton(label: String, description: String, action: () -> Unit): TextView {
-            return TextView(this).apply {
+        fun wheelButton(label: String, description: String, action: () -> Unit): Button {
+            return Button(this).apply {
                 text = label
                 textSize = 19f
                 gravity = Gravity.CENTER
+                isAllCaps = false
+                setPadding(0, 0, 0, 0)
+                minWidth = 0; minimumWidth = 0
+                minHeight = 0; minimumHeight = 0
+                stateListAnimator = null
+                background = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
+                backgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
                 setTextColor(Color.rgb(239, 232, 218))
                 contentDescription = description
                 isClickable = true
@@ -469,8 +476,8 @@ class MainActivity : Activity() {
         dial.addView(wheelButton("›", "Next track", { skip(1) }).apply { textSize = 34f },
             FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER_VERTICAL or Gravity.END).apply { rightMargin = dp(8) })
         val bottom = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
-        bottom.addView(wheelButton("▶", "Play", { if (controller?.isPlaying != true) togglePlayback() }),
-            LinearLayout.LayoutParams(dp(46), dp(42)))
+        playButton = wheelButton("▶", "Play", { if (controller?.isPlaying != true) togglePlayback() })
+        bottom.addView(playButton, LinearLayout.LayoutParams(dp(46), dp(42)))
         bottom.addView(wheelButton("Ⅱ", "Pause", { if (controller?.isPlaying == true) togglePlayback() }),
             LinearLayout.LayoutParams(dp(46), dp(42)))
         dial.addView(bottom, FrameLayout.LayoutParams(-2, dp(44), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(10) })
