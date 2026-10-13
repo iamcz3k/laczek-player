@@ -40,3 +40,8 @@ Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDe
 ## Important limits
 
 This is an evolving test build. Hardware-dependent audio effects vary by device. Tag edits are app-local overrides, not embedded-file tag rewrites. Folder artwork and information files require the user to grant access to the relevant local folder. Playlist imports match local tracks by media ID or title; external paths may not map on a different device. Keep a separate backup of important playlists and local settings.
+
+
+## Neo-brutalist refresh
+
+The `v3x/funtouch-amoled-anr-fix` branch now includes a light yellow-and-cream visual refresh, outlined controls, an iPod-inspired click-wheel playback controller, and incremental multi-select row updates to avoid rebuilding the full song list on each tap. Existing playback and offline library features remain in the same native Android activity.
