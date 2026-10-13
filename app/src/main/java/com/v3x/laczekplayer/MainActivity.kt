@@ -113,8 +113,8 @@ class MainActivity : Activity() {
     private var fullPlayerOpen = false
     private var accentColor = Color.rgb(255, 138, 61)
     private val orange get() = accentColor
-    private val bg get() = if (dark) Color.rgb(15, 16, 20) else Color.rgb(247, 247, 250)
-    private val panel get() = if (dark) Color.rgb(30, 32, 39) else Color.rgb(231, 232, 238)
+    private val bg get() = if (dark) Color.BLACK else Color.rgb(247, 247, 250)
+    private val panel get() = if (dark) Color.rgb(20, 21, 25) else Color.rgb(231, 232, 238)
     private val fg get() = if (dark) Color.rgb(245, 245, 248) else Color.rgb(24, 25, 30)
     private val muted get() = if (dark) Color.rgb(165, 169, 181) else Color.rgb(95, 97, 108)
 
@@ -436,6 +436,8 @@ class MainActivity : Activity() {
         scroll.addView(body)
         screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(screen)
+        screen.alpha = 0.94f; screen.translationY = dp(8).toFloat()
+        screen.animate().alpha(1f).translationY(0f).setDuration(180L).start()
         updatePlaybackUi()
     }
 
