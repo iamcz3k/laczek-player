@@ -103,7 +103,7 @@ class MainActivity : Activity() {
     private lateinit var nowPlaying: TextView
     private lateinit var artworkView: ImageView
     private lateinit var playButton: Button
-    private lateinit var seek: SeekBar
+    private lateinit var seek: SnakeSeekBar
     private lateinit var timeText: TextView
     private var miniPlayerPanel: View? = null
     private lateinit var miniArtwork: ImageView
@@ -347,20 +347,16 @@ class MainActivity : Activity() {
         }
         body.addView(albumText)
 
-        seek = SeekBar(this).apply {
+        seek = SnakeSeekBar(this).apply {
             max = 1000
-            progressTintList = android.content.res.ColorStateList.valueOf(orange)
-            thumbTintList = android.content.res.ColorStateList.valueOf(orange)
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(if (dark) Color.rgb(65, 67, 76) else Color.rgb(205, 207, 215))
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
-                }
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
-            })
+            progressColor = orange
+            trackColor = if (dark) Color.rgb(65, 67, 76) else Color.rgb(205, 207, 215)
+            contentDescription = "Song playback progress. Drag to seek."
+            onProgressChanged = { value, fromUser ->
+                if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
+            }
         }
-        body.addView(seek, LinearLayout.LayoutParams(-1, dp(34)).apply { topMargin = dp(12) })
+        body.addView(seek, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(10) })
         timeText = TextView(this).apply {
             textSize = 11f
             setTextColor(muted)
