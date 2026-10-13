@@ -45,3 +45,11 @@ This is an evolving test build. Hardware-dependent audio effects vary by device.
 ## Neo-brutalist refresh
 
 The `v3x/funtouch-amoled-anr-fix` branch now includes a light yellow-and-cream visual refresh, outlined controls, an iPod-inspired click-wheel playback controller, and incremental multi-select row updates to avoid rebuilding the full song list on each tap. Existing playback and offline library features remain in the same native Android activity.
+
+
+## Version 2.5.0 UI refresh
+
+- Neo-brutalist yellow, cream, pink and purple home screen with a Play now / Vibe anytime hero and four collection cards.
+- Updated playlist details and Now Playing screen, with a tactile click wheel, breathing artwork and track-change fade.
+- Reduced repeated album-art loading during playback UI updates and avoided rebuilding the full song list during single-track selection.
+- Offline playback and the existing library tools remain in place.
