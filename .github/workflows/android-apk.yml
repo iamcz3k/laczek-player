@@ -46,24 +46,24 @@ jobs:
             echo "Offline-only APK must not request INTERNET permission (including merged manifest)" >&2
             exit 1
           fi
-          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.5.0.apk
+          cp "$APK" app/build/outputs/apk/debug/LACZEKPlayer-2.6.0.apk
       - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LACZEKPlayer-2.5.0-debug
-          path: app/build/outputs/apk/debug/LACZEKPlayer-2.5.0.apk
+          name: LACZEKPlayer-2.6.0-debug
+          path: app/build/outputs/apk/debug/LACZEKPlayer-2.6.0.apk
           if-no-files-found: error
           retention-days: 30
       - name: Publish easy-download GitHub Release APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.5.0
-          name: LaCzek Player v2.5.0
+          tag_name: v2.6.0
+          name: LaCzek Player v2.6.0
           make_latest: true
-          files: app/build/outputs/apk/debug/LACZEKPlayer-2.5.0.apk
+          files: app/build/outputs/apk/debug/LACZEKPlayer-2.6.0.apk
           overwrite_files: true
           body: |
-            LaCzek Player v2.5.0 — full neo-brutalist UI refresh and responsiveness fixes.
+            LaCzek Player v2.6.0 — full neo-brutalist UI refresh and responsiveness fixes.
 
             - Redesigned home screen with Play now / Vibe anytime hero and four collection cards.
             - Reworked playlist detail header and high-contrast collection cards.
