@@ -943,7 +943,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(95, 97, 108))
         })
         copy.addView(TextView(this).apply {
-            text = "Play now.\\nVibe anytime."
+            text = "Play now.\nVibe anytime."
             textSize = 28f
             setTextColor(brutalBlack)
             setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
