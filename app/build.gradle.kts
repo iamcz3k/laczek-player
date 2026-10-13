@@ -10,8 +10,8 @@ android {
         applicationId = "com.v3x.laczekplayer"
         minSdk = 23
         targetSdk = 35
-        versionCode = 14
-        versionName = "2.4.0"
+        versionCode = 17
+        versionName = "2.7.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
