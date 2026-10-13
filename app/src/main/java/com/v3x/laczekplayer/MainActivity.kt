@@ -1683,7 +1683,7 @@ class MainActivity : Activity() {
         }
         val currentId = item?.mediaId ?: ""
         if (fullPlayerOpen) {
-            if (widgetPlaying) {
+            if (p?.isPlaying == true) {
                 if (cdDisc?.animation == null) cdDisc?.startAnimation(cdRotation)
             } else cdDisc?.clearAnimation()
         }
