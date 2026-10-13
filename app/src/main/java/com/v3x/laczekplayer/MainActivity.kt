@@ -311,7 +311,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         })
         heading.addView(TextView(this).apply {
-            text = "LaCzek Player"
+            text = "LACZEK Player"
             textSize = 14f
             setTextColor(fg)
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -526,7 +526,7 @@ class MainActivity : Activity() {
         }
         val brandColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brandColumn.addView(TextView(this).apply {
-            text = "LaCzek"
+            text = "LACZEK"
             textSize = 30f
             setTextColor(fg)
             setTypeface(null, android.graphics.Typeface.BOLD)
@@ -540,27 +540,12 @@ class MainActivity : Activity() {
             setPadding(0, dp(2), 0, 0)
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(actionButton(if (selectionMode) "Done" else "Select") {
-            selectionMode = !selectionMode
-            if (selectionMode) { section = "Songs"; currentPlaylist = null } else selectedTrackIds.clear()
-            renderLibrary(); buildUiSelectionRefresh()
-        }.apply { textSize = 12f; setPadding(dp(7), 0, dp(7), 0); minWidth = dp(58); minimumWidth = dp(58); minHeight = dp(44); minimumHeight = dp(44); background = roundedBackground(panel, dp(14)) })
-        header.addView(actionButton("▣") {
-            section = "Folders"; currentPlaylist = null; query = ""
-            search.setText("")
-            renderLibrary()
-        }.apply {
-            textSize = 18f
-            background = roundedBackground(panel, dp(16))
-            minWidth = dp(46); minimumWidth = dp(46)
-            minHeight = dp(48); minimumHeight = dp(48)
-            contentDescription = "Browse folders"
-        })
-        header.addView(actionButton("⚙") { showMoreMenu() }.apply {
-            textSize = 20f
+        header.addView(actionButton("☰") { showMoreMenu() }.apply {
+            textSize = 23f
             background = roundedBackground(panel, dp(16))
             minWidth = dp(48); minimumWidth = dp(48)
             minHeight = dp(48); minimumHeight = dp(48)
+            contentDescription = "Open navigation drawer"
         })
         root.addView(header)
 
@@ -582,35 +567,7 @@ class MainActivity : Activity() {
         searchRow.addView(actionButton("Filters") { showAdvancedSearch() }.apply { textSize = 12f; background = roundedBackground(panel, dp(16)); minWidth = dp(78); minimumWidth = dp(78); minHeight = dp(48); minimumHeight = dp(48) })
         root.addView(searchRow, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
-        val navScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-        }
-        val nav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(2), 0, dp(14))
-        }
-        listOf("Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years",
-            "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
-            "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
-            val selected = section == name
-            nav.addView(actionButton(name) {
-                section = name
-                currentPlaylist = null
-                renderLibrary()
-                buildNavSelection(nav)
-            }.apply {
-                textSize = 12f
-                setPadding(dp(15), 0, dp(15), 0)
-                minHeight = dp(38); minimumHeight = dp(38)
-                background = roundedBackground(if (selected) orange else panel, dp(20))
-                setTextColor(if (selected) Color.BLACK else fg)
-                stateListAnimator = null
-            }, LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(7) })
-        }
-        navScroll.addView(nav)
-        root.addView(navScroll)
+        // Library destinations now live in the AMOLED navigation drawer.
 
         status = TextView(this).apply {
             textSize = 12f
@@ -916,7 +873,7 @@ class MainActivity : Activity() {
 
     private fun addHomeCollections() {
         val hero = FrameLayout(this).apply {
-            background = brutalCardBackground(brutalCream, 24)
+            background = roundedBackground(if (dark) Color.rgb(10, 10, 10) else brutalCream, 24)
             elevation = dp(5).toFloat()
             setPadding(dp(18), dp(15), dp(18), dp(15))
         }
@@ -928,12 +885,12 @@ class MainActivity : Activity() {
             text = "YOUR OFFLINE LIBRARY"
             textSize = 9.5f
             letterSpacing = .14f
-            setTextColor(Color.rgb(95, 97, 108))
+            setTextColor(if (dark) muted else Color.rgb(95, 97, 108))
         })
         copy.addView(TextView(this).apply {
             text = "Play now.\nVibe anytime."
             textSize = 28f
-            setTextColor(brutalBlack)
+            setTextColor(if (dark) fg else brutalBlack)
             setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
             setLineSpacing(0f, .92f)
             setPadding(0, dp(4), 0, 0)
@@ -975,7 +932,7 @@ class MainActivity : Activity() {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), dp(10), dp(10), dp(11))
-                background = brutalCardBackground(brutalCream, 18)
+                background = roundedBackground(if (dark) Color.rgb(10, 10, 10) else brutalCream, 18)
                 elevation = dp(4).toFloat()
                 isClickable = true
                 isFocusable = true
@@ -998,15 +955,15 @@ class MainActivity : Activity() {
                 text = item.icon
                 textSize = 18f
                 gravity = Gravity.CENTER
-                setTextColor(brutalBlack)
+                setTextColor(Color.BLACK)
                 background = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(item.color); cornerRadius = dp(11).toFloat(); setStroke(dp(2), brutalBlack)
+                    setColor(item.color); cornerRadius = dp(11).toFloat(); if (!dark) setStroke(dp(2), brutalBlack)
                 }
             }, LinearLayout.LayoutParams(dp(34), dp(34)).apply { marginEnd = dp(8) })
             iconRow.addView(TextView(this).apply {
                 text = item.title
                 textSize = 13f
-                setTextColor(brutalBlack)
+                setTextColor(if (dark) fg else brutalBlack)
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -1015,7 +972,7 @@ class MainActivity : Activity() {
             card.addView(TextView(this).apply {
                 text = item.subtitle
                 textSize = 10f
-                setTextColor(Color.rgb(95, 97, 108))
+                setTextColor(if (dark) muted else Color.rgb(95, 97, 108))
                 setPadding(0, dp(7), 0, 0)
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -1057,10 +1014,10 @@ class MainActivity : Activity() {
         if (section == "Songs" && !selectionMode && query.isBlank()) addHomeCollections()
         if (selectionMode) {
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(4), 0, dp(10)) }
-            listOf("Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "Playlist" to { playlistSelectedTracks() }, "Share" to { shareSelectedTracks() }, "Delete" to { deleteSelectedTracks() }, "Clear" to { selectedTrackIds.clear(); renderLibrary() }).forEach { (label, action) ->
+            listOf("▶ Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "＋ List" to { playlistSelectedTracks() }, "↗ Share" to { shareSelectedTracks() }, "⌫ Delete" to { deleteSelectedTracks() }, "✕ Clear" to { selectedTrackIds.clear(); selectionMode = false; renderLibrary() }).forEach { (label, action) ->
                 actions.addView(actionButton(label, action).apply { textSize = 11f; background = roundedBackground(panel, dp(14)); minHeight = dp(42); minimumHeight = dp(42) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(4) })
             }
-            songList.addView(TextView(this).apply { text = "${selectedTrackIds.size} selected · tap songs to select"; setTextColor(orange); textSize = 12f; setPadding(dp(2), dp(4), 0, dp(7)) })
+            songList.addView(TextView(this).apply { text = "${selectedTrackIds.size} selected · long-press another song to add it"; setTextColor(orange); textSize = 12f; setPadding(dp(2), dp(4), 0, dp(7)) })
             songList.addView(actions)
         } else if (controller?.currentMediaItem == null) {
             val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
@@ -1156,8 +1113,12 @@ class MainActivity : Activity() {
             if (!dark) elevation = dp(4).toFloat()
             isClickable = true
             isFocusable = true
-            setOnClickListener { if (selectionMode) toggleTrackSelection(track) else playTrack(track) }
-            setOnLongClickListener { if (selectionMode) toggleTrackSelection(track) else showTrackMenu(track); true }
+            setOnClickListener { if (selectionMode) { toggleTrackSelection(track); renderSelectionToolbar() } else playTrack(track) }
+            setOnLongClickListener {
+                if (!selectionMode) { selectionMode = true; section = "Songs"; currentPlaylist = null; selectedTrackIds.clear(); selectedTrackIds.add(track.id.toString()); renderLibrary() }
+                else { toggleTrackSelection(track); renderSelectionToolbar() }
+                true
+            }
         }
         val art = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -1864,13 +1825,72 @@ class MainActivity : Activity() {
         }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun showNavigationDrawer(options: List<String>, onToolSelected: (Int) -> Unit) {
+        val dialog = android.app.Dialog(this)
+        val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(16), dp(12), dp(10)); setBackgroundColor(Color.BLACK) }
+        val scroll = ScrollView(this)
+        val items = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        items.addView(TextView(this).apply { text = "LACZEK"; textSize = 29f; setTextColor(Color.WHITE); setTypeface(android.graphics.Typeface.create("sans-serif-black", 0)); setPadding(dp(8), dp(10), 0, 0) })
+        items.addView(TextView(this).apply { text = "PLAYER  •  OFFLINE MUSIC"; textSize = 10f; letterSpacing = .13f; setTextColor(Color.GRAY); setPadding(dp(8), dp(3), 0, dp(20)) })
+        fun heading(label: String) { items.addView(TextView(this).apply { text = label; textSize = 10f; letterSpacing = .15f; setTextColor(brutalYellow); setTypeface(null, 1); setPadding(dp(10), dp(15), 0, dp(7)) }) }
+        fun row(icon: String, label: String, subtitle: String = "", action: () -> Unit) {
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10), dp(10), dp(8), dp(10)); background = roundedBackground(Color.rgb(12,12,12), dp(14)); isClickable = true; isFocusable = true; setOnClickListener { dialog.dismiss(); action() } }
+            line.addView(TextView(this).apply { text = icon; textSize = 19f; gravity = Gravity.CENTER; setTextColor(brutalYellow) }, LinearLayout.LayoutParams(dp(34), dp(38)))
+            val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(8), 0, 0, 0) }
+            copy.addView(TextView(this).apply { text = label; textSize = 14f; setTextColor(Color.WHITE); setTypeface(null, 1) })
+            if (subtitle.isNotBlank()) copy.addView(TextView(this).apply { text = subtitle; textSize = 10f; setTextColor(Color.GRAY); setPadding(0, dp(2), 0, 0) })
+            line.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+            items.addView(line, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(5) })
+        }
+        heading("YOUR LIBRARY")
+        val destinations = listOf("Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years", "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated", "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists")
+        destinations.forEach { dest ->
+            val glyph = when (dest) { "Songs" -> "♫"; "Albums" -> "▤"; "Artists", "Featured artists" -> "♙"; "Folders" -> "▣"; "Favorites" -> "♥"; "Playlists" -> "☷"; "Recent", "Recently added" -> "↻"; else -> "›" }
+            row(glyph, dest, if (dest == section) "CURRENT VIEW" else "") { section = dest; currentPlaylist = null; query = ""; if (::search.isInitialized) search.setText(""); renderLibrary() }
+        }
+        heading("PLAYER & TOOLS")
+        options.forEachIndexed { index, option ->
+            val glyph = when { option.startsWith("Rescan") -> "↻"; option.startsWith("Sort") -> "⇅"; option.contains("playlist", true) -> "♫"; option.contains("Import") || option.contains("Export") || option.contains("Restore") -> "⇄"; option.contains("Sleep") -> "◷"; option.contains("Theme") || option.contains("Accent") -> "◐"; option.contains("search", true) || option.contains("filters", true) -> "⌕"; option.contains("folder", true) -> "▣"; else -> "⚙" }
+            row(glyph, option) { onToolSelected(index) }
+        }
+        heading("ABOUT")
+        row("ⓘ", "About developer", "Credits and social accounts") { showDeveloperAbout() }
+        scroll.addView(items)
+        shell.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        shell.addView(TextView(this).apply { text = "DEVELOPED BY TITUS LACZEK"; textSize = 10f; letterSpacing = .08f; setTextColor(Color.GRAY); gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(4)) })
+        dialog.setContentView(shell); dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * .86f).toInt(), -1)
+        dialog.window?.setGravity(Gravity.START)
+    }
+
+    private fun showDeveloperAbout() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(14), dp(22), dp(10)); setBackgroundColor(Color.BLACK) }
+        box.addView(TextView(this).apply { text = "LACZEK PLAYER"; textSize = 23f; setTextColor(Color.WHITE); setTypeface(android.graphics.Typeface.create("sans-serif-black", 0)) })
+        box.addView(TextView(this).apply { text = "DEVELOPED BY TITUS LACZEK"; textSize = 14f; setTextColor(brutalYellow); setTypeface(null, 1); setPadding(0, dp(6), 0, dp(8)) })
+        box.addView(TextView(this).apply { text = "An offline-first music player. Your library, playlists and playback stay on your device."; textSize = 12f; setTextColor(Color.LTGRAY); setPadding(0, 0, 0, dp(14)) })
+        fun social(label: String, handle: String, url: String) {
+            box.addView(actionButton("$label   $handle") { openSocial(url) }.apply { gravity = Gravity.CENTER_VERTICAL; setTextColor(Color.WHITE); background = roundedBackground(Color.rgb(18,18,18), dp(14)); minHeight = dp(48); minimumHeight = dp(48) }, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(7) })
+        }
+        social("𝕏", "@iam_czek", "https://x.com/iam_czek")
+        social("◎", "Instagram  @iamczek", "https://instagram.com/iamczek")
+        social("♪", "TikTok  @iamczek", "https://www.tiktok.com/@iamczek")
+        social("▶", "Twitch  iamcz3k", "https://www.twitch.tv/iamcz3k")
+        AlertDialog.Builder(this).setView(box).setPositiveButton("Close", null).show().window?.setBackgroundDrawableResource(android.R.color.black)
+    }
+
+    private fun openSocial(url: String) {
+        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        catch (_: Exception) { Toast.makeText(this, "Could not open this social profile", Toast.LENGTH_SHORT).show() }
+    }
+
     private fun showMoreMenu() {
         val crossfade = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("crossfade_enabled", false)
         val artworkColors = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("artwork_colors", true)
         val skipSilence = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("skip_silence_enabled", false)
         val partyMode = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("mini_party_mode", false)
         val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Matte AMOLED" else "Yellow"}, choose theme", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
-        showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
+        showNavigationDrawer(options.toList()) { which ->
             when (which) {
                 0 -> scanLibrary()
                 1 -> chooseSort()
@@ -2572,10 +2592,11 @@ class MainActivity : Activity() {
         startActivityForResult(i, 204)
     }
 
-    private fun buildUiSelectionRefresh() {
-        if (!::root.isInitialized) return
-        val header = root.getChildAt(0) as? LinearLayout ?: return
-        if (header.childCount > 1) (header.getChildAt(1) as? Button)?.text = if (selectionMode) "Done" else "Select"
+    private fun buildUiSelectionRefresh() { if (!::root.isInitialized) return; renderSelectionToolbar() }
+
+    private fun renderSelectionToolbar() {
+        if (!::songList.isInitialized || !selectionMode) return
+        for (i in 0 until songList.childCount) { val child = songList.getChildAt(i); if (child is TextView && child.text.toString().contains("selected ·")) { child.text = "${selectedTrackIds.size} selected · long-press another song to add it"; break } }
     }
 
     private fun trackRowBackground(track: Track): GradientDrawable {
@@ -2601,10 +2622,7 @@ class MainActivity : Activity() {
                 break
             }
         }
-        if (selectionMode && songList.childCount > 0) {
-            (songList.getChildAt(0) as? TextView)?.text =
-                "${selectedTrackIds.size} selected · tap songs to select"
-        }
+        if (selectionMode) renderSelectionToolbar()
     }
 
     private fun selectedTracks(): List<Track> = tracks.filter { it.id.toString() in selectedTrackIds }
