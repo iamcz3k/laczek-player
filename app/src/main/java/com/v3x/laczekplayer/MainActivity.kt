@@ -1357,7 +1357,7 @@ class MainActivity : Activity() {
         val genre = EditText(this).apply { hint = "Genre"; setText(genreOf(track)); setTextColor(fg) }
         val year = EditText(this).apply { hint = "Year"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setText(if (yearOf(track) > 0) yearOf(track).toString() else ""); setTextColor(fg) }
         box.addView(title); box.addView(artist); box.addView(album); box.addView(genre); box.addView(year)
-        AlertDialog.Builder(this).setTitle("Edit tags in LaCzek Player").setMessage("These overrides are stored locally in the app; the original audio file is not modified.")
+        AlertDialog.Builder(this).setTitle("Edit tags in LACZEK Player").setMessage("These overrides are stored locally in the app; the original audio file is not modified.")
             .setView(box).setPositiveButton("Save") { _, _ ->
                 val id = track.id.toString()
                 customTitles[id] = title.text.toString().trim().ifEmpty { track.title }
@@ -1649,7 +1649,7 @@ class MainActivity : Activity() {
             } else cdDisc?.clearAnimation()
         }
         if (currentId.isNotBlank() && currentId != lastAccentTrackId) tracks.firstOrNull { it.id.toString() == currentId }?.let { updateArtworkAccent(it) }
-        val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LaCzek Player"
+        val widgetTitle = item?.mediaMetadata?.title?.toString() ?: "LACZEK Player"
         val widgetArtist = item?.mediaMetadata?.artist?.toString() ?: "Offline music"
         val widgetPlaying = p?.isPlaying == true
         val widgetFavorite = currentId.isNotBlank() && favorites.contains(currentId)
