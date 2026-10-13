@@ -39,6 +39,8 @@ import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ExecutionException
 
+private data class HomeCollection(val title: String, val subtitle: String, val icon: String, val color: Int, val target: String)
+
 private data class Track(
     val id: Long, val title: String, val artist: String, val album: String,
     val path: String, val duration: Long, val uri: Uri,
@@ -944,12 +946,11 @@ class MainActivity : Activity() {
             setPadding(dp(2), 0, 0, dp(10))
         })
         val grid = GridLayout(this).apply { columnCount = 2; useDefaultMargins = false }
-        data class Collection(val title: String, val subtitle: String, val icon: String, val color: Int, val target: String)
         val collections = listOf(
-            Collection("Liked songs", "${favorites.size} saved tracks", "♥", brutalPink, "Favorites"),
-            Collection("Recently played", "Jump back in", "↻", brutalPurple, "Recent"),
-            Collection("Downloads", "Browse local folders", "↓", brutalGreen, "Downloads"),
-            Collection("Playlists", "${playlistMap.size} made for you", "♫", brutalYellow, "Playlists")
+            HomeCollection("Liked songs", "${favorites.size} saved tracks", "♥", brutalPink, "Favorites"),
+            HomeCollection("Recently played", "Jump back in", "↻", brutalPurple, "Recent"),
+            HomeCollection("Downloads", "Browse local folders", "↓", brutalGreen, "Downloads"),
+            HomeCollection("Playlists", "${playlistMap.size} made for you", "♫", brutalYellow, "Playlists")
         )
         collections.forEach { item ->
             val card = LinearLayout(this).apply {
