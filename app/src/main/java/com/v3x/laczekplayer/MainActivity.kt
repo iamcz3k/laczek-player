@@ -36,6 +36,7 @@ import androidx.media3.session.SessionToken
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.util.concurrent.Executors
 import java.util.concurrent.ExecutionException
 
 private data class Track(
@@ -80,6 +81,8 @@ class MainActivity : Activity() {
     private var lastAccentTrackId = ""
     private val uiHandler = Handler(Looper.getMainLooper())
     private var uiTicker: Runnable? = null
+    private val libraryExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var scanInProgress = false
     private var sortMode = "Title"
     private var dark = true
     private var controller: MediaController? = null
@@ -671,41 +674,51 @@ class MainActivity : Activity() {
     }
 
     private fun scanLibrary() {
-        tracks.clear()
-        loadGenreMap()
-        val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-        val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
-        val columns = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.DURATION, pathColumn, MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.COMPOSER, MediaStore.Audio.Media.YEAR, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE)
-        try {
-            contentResolver.query(collection, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null,
-                MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")?.use { c ->
-                val id = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-                val title = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-                val artist = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-                val album = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-                val duration = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-                val path = c.getColumnIndex(pathColumn)
-                val albumId = c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
-                val composer = c.getColumnIndex(MediaStore.Audio.Media.COMPOSER)
-                val year = c.getColumnIndex(MediaStore.Audio.Media.YEAR)
-                val size = c.getColumnIndex(MediaStore.Audio.Media.SIZE)
-                val mime = c.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
-                while (c.moveToNext()) {
-                    val trackId = c.getLong(id)
-                    tracks.add(Track(trackId, c.getString(title) ?: "Unknown title", c.getString(artist) ?: "Unknown artist",
-                        c.getString(album) ?: "Unknown album", if (path >= 0) c.getString(path) ?: "Unknown folder" else "Unknown folder",
-                        c.getLong(duration), ContentUris.withAppendedId(collection, trackId),
-                        if (albumId >= 0) c.getLong(albumId) else -1L, if (composer >= 0) c.getString(composer) ?: "" else "",
-                        if (year >= 0) c.getInt(year) else 0, if (size >= 0) c.getLong(size) else 0L,
-                        if (mime >= 0) c.getString(mime) ?: "" else "", genreByTrackId[trackId] ?: "Unknown genre"))
+        if (scanInProgress) return
+        scanInProgress = true
+        status.text = "Scanning local music…"
+        libraryExecutor.execute {
+            val scannedTracks = mutableListOf<Track>()
+            try {
+                loadGenreMap()
+                val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                val pathColumn = if (Build.VERSION.SDK_INT >= 29) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
+                val columns = arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.ALBUM, MediaStore.Audio.Media.DURATION, pathColumn, MediaStore.Audio.Media.ALBUM_ID,
+                    MediaStore.Audio.Media.COMPOSER, MediaStore.Audio.Media.YEAR, MediaStore.Audio.Media.SIZE, MediaStore.Audio.Media.MIME_TYPE)
+                contentResolver.query(collection, columns, "${MediaStore.Audio.Media.IS_MUSIC} != 0", null,
+                    MediaStore.Audio.Media.TITLE + " COLLATE NOCASE ASC")?.use { c ->
+                    val id = c.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                    val title = c.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                    val artist = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                    val album = c.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                    val duration = c.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                    val path = c.getColumnIndex(pathColumn)
+                    val albumId = c.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+                    val composer = c.getColumnIndex(MediaStore.Audio.Media.COMPOSER)
+                    val year = c.getColumnIndex(MediaStore.Audio.Media.YEAR)
+                    val size = c.getColumnIndex(MediaStore.Audio.Media.SIZE)
+                    val mime = c.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
+                    while (c.moveToNext()) {
+                        val trackId = c.getLong(id)
+                        scannedTracks.add(Track(trackId, c.getString(title) ?: "Unknown title", c.getString(artist) ?: "Unknown artist",
+                            c.getString(album) ?: "Unknown album", if (path >= 0) c.getString(path) ?: "Unknown folder" else "Unknown folder",
+                            c.getLong(duration), ContentUris.withAppendedId(collection, trackId),
+                            if (albumId >= 0) c.getLong(albumId) else -1L, if (composer >= 0) c.getString(composer) ?: "" else "",
+                            if (year >= 0) c.getInt(year) else 0, if (size >= 0) c.getLong(size) else 0L,
+                            if (mime >= 0) c.getString(mime) ?: "" else "", genreByTrackId[trackId] ?: "Unknown genre"))
+                    }
                 }
+            } catch (_: Exception) {
+                runOnUiThread { status.text = "Could not scan storage. Check audio permission." }
             }
-        } catch (_: Exception) {
-            status.text = "Could not scan storage. Check audio permission."
+            runOnUiThread {
+                tracks.clear()
+                tracks.addAll(scannedTracks)
+                scanInProgress = false
+                renderLibrary()
+            }
         }
-        renderLibrary()
     }
 
     private fun loadGenreMap() {
@@ -779,7 +792,10 @@ class MainActivity : Activity() {
         }
         return when (sortMode) {
             "Artist" -> result.sortedBy { artistOf(it).lowercase(Locale.ROOT) }
+            "Title Z–A" -> result.sortedByDescending { titleOf(it).lowercase(Locale.ROOT) }
+            "Artist Z–A" -> result.sortedByDescending { artistOf(it).lowercase(Locale.ROOT) }
             "Album" -> result.sortedWith(compareBy<Track> { albumOf(it).lowercase(Locale.ROOT) }.thenBy { titleOf(it).lowercase(Locale.ROOT) })
+            "Album Z–A" -> result.sortedWith(compareByDescending<Track> { albumOf(it).lowercase(Locale.ROOT) }.thenBy { titleOf(it).lowercase(Locale.ROOT) })
             "Duration" -> result.sortedByDescending { it.duration }
             "Shortest" -> result.sortedBy { it.duration }
             "Year newest" -> result.sortedByDescending { yearOf(it) }
@@ -1738,7 +1754,7 @@ class MainActivity : Activity() {
     }
 
     private fun chooseSort() {
-        val modes = arrayOf("Title", "Artist", "Album", "Duration", "Shortest", "Newest", "Year newest", "Year oldest", "File size", "Rating", "Play count", "Format")
+        val modes = arrayOf("Title", "Title Z–A", "Artist", "Artist Z–A", "Album", "Album Z–A", "Duration", "Shortest", "Newest", "Recently added", "Year newest", "Year oldest", "File size", "Rating", "Play count", "Format")
         AlertDialog.Builder(this).setTitle("Sort library").setSingleChoiceItems(modes, modes.indexOf(sortMode).coerceAtLeast(0)) { d, which ->
             sortMode = modes[which]; saveLocalSettings(); renderLibrary(); d.dismiss()
         }.show()
