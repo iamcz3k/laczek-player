@@ -2369,7 +2369,7 @@ class MainActivity : Activity() {
                 if (maxOf(r, g, b) - minOf(r, g, b) < 22) { r = 255; g = 138; b = 61 }
                 else if (maxOf(r, g, b) < 105) { r = (r + 65).coerceAtMost(255); g = (g + 65).coerceAtMost(255); b = (b + 65).coerceAtMost(255) }
                 accentColor = Color.rgb(r, g, b)
-                if (::seek.isInitialized) { seek.progressTintList = android.content.res.ColorStateList.valueOf(orange); seek.thumbTintList = android.content.res.ColorStateList.valueOf(orange) }
+                if (::seek.isInitialized) { seek.progressColor = orange; seek.invalidate() }
                 if (::playButton.isInitialized) playButton.background = roundedBackground(orange, dp(25))
                 if (::miniPlayButton.isInitialized) miniPlayButton.setTextColor(orange)
             }
