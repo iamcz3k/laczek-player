@@ -286,7 +286,7 @@ class MainActivity : Activity() {
             text = "NOW PLAYING"
             textSize = 10f
             letterSpacing = .16f
-            setTextColor(orange)
+            setTextColor(if (dark) orange else brutalPink)
             gravity = Gravity.CENTER
         })
         heading.addView(TextView(this).apply {
@@ -319,7 +319,8 @@ class MainActivity : Activity() {
         }
         artworkView = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
-            background = roundedBackground(panel, dp(28))
+            background = if (dark) roundedBackground(panel, dp(28)) else brutalCardBackground(brutalCream, 28)
+            elevation = if (dark) 0f else dp(6).toFloat()
             clipToOutline = true
             contentDescription = "Album artwork"
             setOnClickListener { showArtworkPreview() }
@@ -331,8 +332,9 @@ class MainActivity : Activity() {
         })
         nowPlaying = TextView(this).apply {
             text = ""
-            textSize = 22f
+            textSize = 25f
             setTextColor(fg)
+            if (!dark) setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
             gravity = Gravity.CENTER
             setTypeface(null, android.graphics.Typeface.BOLD)
             maxLines = 2
@@ -357,8 +359,8 @@ class MainActivity : Activity() {
 
         seek = SnakeSeekBar(this).apply {
             max = 1000
-            progressColor = orange
-            trackColor = if (dark) Color.rgb(65, 67, 76) else Color.rgb(205, 207, 215)
+            progressColor = if (dark) orange else brutalPink
+            trackColor = if (dark) Color.rgb(65, 67, 76) else brutalBlack
             contentDescription = "Song playback progress. Drag to seek."
             onProgressChanged = { value, fromUser ->
                 if (fromUser) controller?.let { if (it.duration > 0) it.seekTo(it.duration * value / 1000L) }
@@ -891,6 +893,123 @@ class MainActivity : Activity() {
     private var abTicker: Runnable? = null
     private var lastPositionSavedAtMs = 0L
 
+    private fun addHomeCollections() {
+        val hero = FrameLayout(this).apply {
+            background = brutalCardBackground(brutalCream, 24)
+            elevation = dp(5).toFloat()
+            setPadding(dp(18), dp(15), dp(18), dp(15))
+        }
+        val copy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        copy.addView(TextView(this).apply {
+            text = "YOUR OFFLINE LIBRARY"
+            textSize = 9.5f
+            letterSpacing = .14f
+            setTextColor(Color.rgb(95, 97, 108))
+        })
+        copy.addView(TextView(this).apply {
+            text = "Play now.\\nVibe anytime."
+            textSize = 28f
+            setTextColor(brutalBlack)
+            setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
+            setLineSpacing(0f, .92f)
+            setPadding(0, dp(4), 0, 0)
+        })
+        hero.addView(copy, FrameLayout.LayoutParams(-1, -1, Gravity.START or Gravity.CENTER_VERTICAL))
+        hero.addView(View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(brutalPink)
+            }
+        }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.TOP or Gravity.END).apply {
+            topMargin = dp(6); rightMargin = dp(4)
+        })
+        hero.addView(View(this).apply {
+            background = brutalCardBackground(brutalPurple, 4)
+            rotation = -8f
+        }, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.BOTTOM or Gravity.END).apply {
+            bottomMargin = dp(7); rightMargin = dp(26)
+        })
+        songList.addView(hero, LinearLayout.LayoutParams(-1, dp(126)).apply {
+            bottomMargin = dp(17); topMargin = dp(3)
+        })
+        songList.addView(TextView(this).apply {
+            text = "MY COLLECTIONS"
+            textSize = 11f
+            letterSpacing = .12f
+            setTextColor(if (dark) brutalYellow else brutalBlack)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(dp(2), 0, 0, dp(10))
+        })
+        val grid = GridLayout(this).apply { columnCount = 2; useDefaultMargins = false }
+        data class Collection(val title: String, val subtitle: String, val icon: String, val color: Int, val target: String)
+        val collections = listOf(
+            Collection("Liked songs", "${favorites.size} saved tracks", "♥", brutalPink, "Favorites"),
+            Collection("Recently played", "Jump back in", "↻", brutalPurple, "Recent"),
+            Collection("Downloads", "Browse local folders", "↓", brutalGreen, "Downloads"),
+            Collection("Playlists", "${playlistMap.size} made for you", "♫", brutalYellow, "Playlists")
+        )
+        collections.forEach { item ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(10), dp(10), dp(11))
+                background = brutalCardBackground(brutalCream, 18)
+                elevation = dp(4).toFloat()
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    when (item.target) {
+                        "Downloads" -> {
+                            section = "Folders"; currentPlaylist = null; query = "Download"
+                            if (::search.isInitialized) search.setText("Download")
+                            renderLibrary()
+                        }
+                        "Playlists" -> { section = "Playlists"; currentPlaylist = null; query = ""; search.setText(""); renderLibrary() }
+                        else -> { section = item.target; currentPlaylist = null; query = ""; search.setText(""); renderLibrary() }
+                    }
+                }
+            }
+            card.addView(View(this).apply { background = brutalCardBackground(item.color, 3) },
+                LinearLayout.LayoutParams(-1, dp(7)).apply { bottomMargin = dp(10) })
+            val iconRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            iconRow.addView(TextView(this).apply {
+                text = item.icon
+                textSize = 18f
+                gravity = Gravity.CENTER
+                setTextColor(brutalBlack)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(item.color); cornerRadius = dp(11).toFloat(); setStroke(dp(2), brutalBlack)
+                }
+            }, LinearLayout.LayoutParams(dp(34), dp(34)).apply { marginEnd = dp(8) })
+            iconRow.addView(TextView(this).apply {
+                text = item.title
+                textSize = 13f
+                setTextColor(brutalBlack)
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            card.addView(iconRow)
+            card.addView(TextView(this).apply {
+                text = item.subtitle
+                textSize = 10f
+                setTextColor(Color.rgb(95, 97, 108))
+                setPadding(0, dp(7), 0, 0)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            val params = GridLayout.LayoutParams().apply {
+                width = 0; height = dp(112)
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                setMargins(dp(3), dp(3), dp(5), dp(7))
+            }
+            grid.addView(card, params)
+        }
+        songList.addView(grid, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+    }
+
     private fun renderLibrary() {
         if (!::songList.isInitialized) return
         songList.removeAllViews()
@@ -915,6 +1034,7 @@ class MainActivity : Activity() {
             section == "Playlists" -> currentPlaylist ?: "${playlistMap.size} playlists · tap ⋮ to manage"
             else -> "${visible.size} songs on this device · sorted by $sortMode"
         }
+        if (section == "Songs" && !selectionMode && query.isBlank()) addHomeCollections()
         if (selectionMode) {
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(4), 0, dp(10)) }
             listOf("Queue" to { queueSelectedTracks() }, "♥ Fav" to { favoriteSelectedTracks() }, "Playlist" to { playlistSelectedTracks() }, "Clear" to { selectedTrackIds.clear(); renderLibrary() }).forEach { (label, action) ->
@@ -968,8 +1088,39 @@ class MainActivity : Activity() {
             }
             songList.addView(listRow("+ Create playlist", "Save selected tracks in a local playlist") { createPlaylist() })
         } else {
-            visible.forEach { track ->
-                songList.addView(trackRow(track))
+            if (section == "Playlists" && currentPlaylist != null) {
+                val playlistHero = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(16), dp(14), dp(16), dp(14))
+                    background = brutalCardBackground(brutalCream, 22)
+                    elevation = dp(5).toFloat()
+                }
+                playlistHero.addView(View(this).apply { background = brutalCardBackground(brutalPurple, 3) },
+                    LinearLayout.LayoutParams(-1, dp(8)).apply { bottomMargin = dp(13) })
+                playlistHero.addView(TextView(this).apply {
+                    text = currentPlaylist!!.uppercase(Locale.ROOT)
+                    textSize = 24f
+                    setTextColor(brutalBlack)
+                    setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
+                    maxLines = 2
+                })
+                playlistHero.addView(TextView(this).apply {
+                    text = "${visible.size} TRACKS · STORED ON THIS DEVICE"
+                    textSize = 10f
+                    letterSpacing = .08f
+                    setTextColor(Color.rgb(95, 97, 108))
+                    setPadding(0, dp(5), 0, 0)
+                })
+                songList.addView(playlistHero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+            }
+            visible.forEachIndexed { index, track ->
+                val row = trackRow(track)
+                if (!dark && index < 10) {
+                    row.alpha = 0f
+                    row.translationY = dp(8).toFloat()
+                    row.animate().alpha(1f).translationY(0f).setStartDelay(index * 40L).setDuration(180L).start()
+                }
+                songList.addView(row)
             }
         }
     }
@@ -1045,13 +1196,15 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(10), dp(10), dp(10))
-            background = roundedBackground(if (dark) Color.rgb(15, 15, 15) else panel, dp(20))
+            background = if (dark) roundedBackground(Color.rgb(15, 15, 15), dp(20)) else brutalCardBackground(brutalCream, 20)
+            if (!dark) elevation = dp(4).toFloat()
             isClickable = true
             isFocusable = true
             setOnClickListener { click() }
         }
         val cover = FrameLayout(this).apply {
-            background = roundedBackground(bg, dp(13))
+            background = roundedBackground(if (dark) bg else brutalYellow, dp(13))
+            if (!dark) elevation = dp(2).toFloat()
             clipToPadding = false
             clipChildren = false
         }
@@ -1059,7 +1212,7 @@ class MainActivity : Activity() {
             text = "♫"
             textSize = 21f
             gravity = Gravity.CENTER
-            setTextColor(orange)
+            setTextColor(if (dark) orange else brutalBlack)
             setTypeface(null, android.graphics.Typeface.BOLD)
         }, FrameLayout.LayoutParams(-1, -1))
         row.addView(cover, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
