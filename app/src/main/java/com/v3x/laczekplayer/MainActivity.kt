@@ -111,11 +111,17 @@ class MainActivity : Activity() {
     private lateinit var miniArtistLabel: TextView
     private lateinit var miniPlayButton: Button
     private var fullPlayerOpen = false
-    private var accentColor = Color.rgb(255, 138, 61)
+    private var accentColor = Color.rgb(255, 210, 31)
     private val orange get() = accentColor
-    private val bg get() = if (dark) Color.BLACK else Color.rgb(247, 247, 250)
-    private val panel get() = if (dark) Color.rgb(20, 21, 25) else Color.rgb(231, 232, 238)
-    private val fg get() = if (dark) Color.rgb(245, 245, 248) else Color.rgb(24, 25, 30)
+    private val brutalYellow = Color.rgb(255, 210, 31)
+    private val brutalPink = Color.rgb(255, 92, 138)
+    private val brutalPurple = Color.rgb(123, 97, 255)
+    private val brutalGreen = Color.rgb(61, 220, 75)
+    private val brutalCream = Color.rgb(250, 247, 242)
+    private val brutalBlack = Color.BLACK
+    private val bg get() = if (dark) Color.BLACK else brutalYellow
+    private val panel get() = if (dark) Color.rgb(20, 21, 25) else brutalCream
+    private val fg get() = if (dark) Color.rgb(245, 245, 248) else brutalBlack
     private val muted get() = if (dark) Color.rgb(165, 169, 181) else Color.rgb(95, 97, 108)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -131,8 +137,10 @@ class MainActivity : Activity() {
     private fun loadLocalSettings() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
-        dark = prefs.getBoolean("dark", true)
-        accentColor = prefs.getInt("accent", Color.rgb(255, 138, 61))
+        val migratedNeoBrutal = prefs.getBoolean("neo_brutal_migrated", false)
+        dark = if (migratedNeoBrutal) prefs.getBoolean("dark", false) else false
+        accentColor = if (migratedNeoBrutal) prefs.getInt("accent", brutalYellow) else brutalYellow
+        if (!migratedNeoBrutal) prefs.edit().putBoolean("neo_brutal_migrated", true).putBoolean("dark", false).putInt("accent", brutalYellow).apply()
         hiddenFolders.addAll(prefs.getStringSet("hidden_folders", emptySet()) ?: emptySet())
         sortMode = prefs.getString("sort", "Title") ?: "Title"
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
@@ -363,30 +371,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         body.addView(timeText, LinearLayout.LayoutParams(-1, dp(20)))
-        val controls = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(18), 0, dp(18))
-        }
-        controls.addView(actionButton("⏮") { skip(-1) }.apply {
-            textSize = 23f; background = roundedBackground(panel, dp(20))
-        }, LinearLayout.LayoutParams(dp(52), dp(52)).apply { marginEnd = dp(10) })
-        controls.addView(actionButton("−15") { controller?.let { it.seekTo((it.currentPosition - 15000).coerceAtLeast(0)) } }.apply {
-            textSize = 12f; background = roundedBackground(panel, dp(18))
-        }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(10) })
-        playButton = actionButton("▶") { togglePlayback() }.apply {
-            textSize = 26f
-            setTextColor(Color.BLACK)
-            background = roundedBackground(orange, dp(25))
-        }
-        controls.addView(playButton, LinearLayout.LayoutParams(dp(70), dp(62)).apply { marginEnd = dp(10) })
-        controls.addView(actionButton("+15") { controller?.let { it.seekTo((it.currentPosition + 15000).coerceAtMost(it.duration.coerceAtLeast(0))) } }.apply {
-            textSize = 12f; background = roundedBackground(panel, dp(18))
-        }, LinearLayout.LayoutParams(dp(48), dp(52)).apply { marginEnd = dp(10) })
-        controls.addView(actionButton("⏭") { skip(1) }.apply {
-            textSize = 23f; background = roundedBackground(panel, dp(20))
-        }, LinearLayout.LayoutParams(dp(52), dp(52)))
-        body.addView(controls)
+        addClickWheel(body)
         val toolGrid = GridLayout(this).apply {
             columnCount = 3
             rowCount = 3
@@ -439,6 +424,66 @@ class MainActivity : Activity() {
         screen.alpha = 0.96f; screen.translationY = dp(10).toFloat()
         screen.animate().alpha(1f).translationY(0f).setDuration(220L).start()
         updatePlaybackUi()
+    }
+
+    private fun addClickWheel(body: LinearLayout) {
+        val card = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = brutalCardBackground(brutalCream, 28)
+            elevation = dp(8).toFloat()
+        }
+        val dial = FrameLayout(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.rgb(42, 42, 44))
+            }
+            elevation = dp(8).toFloat()
+            contentDescription = "iPod-style playback wheel"
+        }
+        fun wheelButton(label: String, description: String, action: () -> Unit): TextView {
+            return TextView(this).apply {
+                text = label
+                textSize = 19f
+                gravity = Gravity.CENTER
+                setTextColor(Color.rgb(239, 232, 218))
+                contentDescription = description
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    animate().cancel()
+                    animate().scaleX(.94f).scaleY(.94f).setDuration(120L).withEndAction {
+                        action()
+                        animate().scaleX(1f).scaleY(1f).setDuration(150L)
+                            .setInterpolator(android.view.animation.OvershootInterpolator(1.15f)).start()
+                    }.start()
+                }
+            }
+        }
+        val size = dp(230)
+        dial.addView(wheelButton("⤨", "Shuffle playback", { toggleShuffle() }),
+            FrameLayout.LayoutParams(dp(54), dp(42), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(10) })
+        dial.addView(wheelButton("‹", "Previous track", { skip(-1) }).apply { textSize = 34f },
+            FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER_VERTICAL or Gravity.START).apply { leftMargin = dp(8) })
+        dial.addView(wheelButton("›", "Next track", { skip(1) }).apply { textSize = 34f },
+            FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER_VERTICAL or Gravity.END).apply { rightMargin = dp(8) })
+        val bottom = LinearLayout(this).apply { gravity = Gravity.CENTER; orientation = LinearLayout.HORIZONTAL }
+        bottom.addView(wheelButton("▶", "Play", { if (controller?.isPlaying != true) togglePlayback() }),
+            LinearLayout.LayoutParams(dp(46), dp(42)))
+        bottom.addView(wheelButton("Ⅱ", "Pause", { if (controller?.isPlaying == true) togglePlayback() }),
+            LinearLayout.LayoutParams(dp(46), dp(42)))
+        dial.addView(bottom, FrameLayout.LayoutParams(-2, dp(44), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(10) })
+        dial.addView(View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.rgb(34, 34, 36))
+                setStroke(dp(1), Color.rgb(53, 53, 56))
+            }
+            elevation = dp(2).toFloat()
+        }, FrameLayout.LayoutParams(dp(104), dp(104), Gravity.CENTER))
+        card.addView(dial, LinearLayout.LayoutParams(size, size))
+        body.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10); bottomMargin = dp(14) })
     }
 
     private fun buildUi() {
@@ -645,19 +690,37 @@ class MainActivity : Activity() {
         setTextColor(fg)
         backgroundTintList = android.content.res.ColorStateList.valueOf(panel)
         stateListAnimator = null
+        if (!dark) {
+            background = brutalCardBackground(panel, 14)
+            elevation = dp(5).toFloat()
+            setTextColor(brutalBlack)
+        }
         setOnClickListener {
             animate().cancel()
-            animate().scaleX(0.96f).scaleY(0.96f).setDuration(65L).withEndAction {
-                animate().scaleX(1f).scaleY(1f).setDuration(105L).start()
-                action()
-            }.start()
+            animate().translationX(dp(4).toFloat()).translationY(dp(4).toFloat())
+                .scaleX(0.98f).scaleY(0.98f).setDuration(65L).withEndAction {
+                    elevation = if (dark) 0f else dp(1).toFloat()
+                    action()
+                    postDelayed({
+                        animate().translationX(0f).translationY(0f).scaleX(1f).scaleY(1f)
+                            .setDuration(105L).withEndAction { elevation = if (dark) 0f else dp(5).toFloat() }.start()
+                    }, 30L)
+                }.start()
         }
     }
 
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
         setColor(color)
         cornerRadius = radius.toFloat()
+        if (!dark) setStroke(dp(3), brutalBlack)
     }
+
+    private fun brutalCardBackground(color: Int = panel, radius: Int = 22) =
+        android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(3), brutalBlack)
+        }
 
     private fun hasAudioPermission(): Boolean {
         val p = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
@@ -910,7 +973,9 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(10), dp(6), dp(10))
-            background = roundedBackground(if (track.id.toString() in selectedTrackIds) Color.argb(if (dark) 65 else 45, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (isCurrent) Color.argb(if (dark) 40 else 24, Color.red(orange), Color.green(orange), Color.blue(orange)) else if (dark) Color.rgb(15, 15, 15) else panel, dp(20))
+            tag = track.id.toString()
+            background = trackRowBackground(track)
+            if (!dark) elevation = dp(4).toFloat()
             isClickable = true
             isFocusable = true
             setOnClickListener { if (selectionMode) toggleTrackSelection(track) else playTrack(track) }
@@ -2290,10 +2355,33 @@ class MainActivity : Activity() {
         if (header.childCount > 1) (header.getChildAt(1) as? Button)?.text = if (selectionMode) "Done" else "Select"
     }
 
+    private fun trackRowBackground(track: Track): GradientDrawable {
+        val id = track.id.toString()
+        val color = when {
+            id in selectedTrackIds -> if (dark) Color.rgb(75, 52, 12) else brutalYellow
+            controller?.currentMediaItem?.mediaId == id -> if (dark) Color.rgb(38, 32, 20) else brutalPink
+            dark -> Color.rgb(15, 15, 15)
+            else -> brutalCream
+        }
+        return roundedBackground(color, dp(16))
+    }
+
     private fun toggleTrackSelection(track: Track) {
         val id = track.id.toString()
         if (!selectedTrackIds.add(id)) selectedTrackIds.remove(id)
-        renderLibrary()
+        // Avoid rebuilding every song row and reloading album art for a single selection tap.
+        for (i in 0 until songList.childCount) {
+            val row = songList.getChildAt(i)
+            if (row.tag == id) {
+                row.background = trackRowBackground(track)
+                row.isSelected = id in selectedTrackIds
+                break
+            }
+        }
+        if (selectionMode && songList.childCount > 0) {
+            (songList.getChildAt(0) as? TextView)?.text =
+                "${selectedTrackIds.size} selected · tap songs to select"
+        }
     }
 
     private fun selectedTracks(): List<Track> = tracks.filter { it.id.toString() in selectedTrackIds }
