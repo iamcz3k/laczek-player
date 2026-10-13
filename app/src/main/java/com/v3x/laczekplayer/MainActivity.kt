@@ -403,7 +403,7 @@ class MainActivity : Activity() {
         transport.addView(transportButton("⏭", "Next track", { skip(1) }), LinearLayout.LayoutParams(dp(56), dp(44)).apply { marginStart = dp(10) })
         body.addView(transport, LinearLayout.LayoutParams(-1, -2))
         val toolGrid = GridLayout(this).apply { columnCount = 4; useDefaultMargins = false }
-        val tools = listOf(
+        val tools: List<Triple<String, String, () -> Unit>> = listOf(
             Triple("♡", "Favorite", { toggleCurrentFavorite() }),
             Triple("♫", "Lyrics", { showLyrics() }),
             Triple("≡", "Queue", { showQueue() }),
