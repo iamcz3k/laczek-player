@@ -64,10 +64,10 @@ jobs:
           files: app/build/outputs/apk/debug/LACZEKPlayer-2.5.0.apk
           overwrite_files: true
           body: |
-            LaCzek Player v2.5.0 — redesigned violet AMOLED interface, single-AirPod identity, and local video playback with audio extraction to M4A.
+            LaCzek Player v2.5.0 — redesigned violet AMOLED interface, single-AirPod identity, local video playback, MP4-to-MP3 conversion, and audio extraction to M4A.
 
             - Fully refreshed violet/AMOLED palette and LaCzek AirPod identity.
-            - Local video library with playback controls, speed adjustment, rotation, details, sharing, and audio extraction to M4A.
+            - Local video library with playback controls, speed adjustment, rotation, details, sharing, MP4-to-MP3 conversion, and audio extraction to M4A.
             - Minimum file size and duration filters, stored locally and applied to library views.
             - Expanded offline sorting by year, file size, rating, play count, format and duration.
             - Search local saved lyrics along with track metadata.
