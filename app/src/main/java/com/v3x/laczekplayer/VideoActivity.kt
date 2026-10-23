@@ -24,6 +24,8 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
 import java.util.Locale
 
@@ -273,6 +275,7 @@ class VideoActivity : Activity() {
         val tools = GridLayout(this).apply { columnCount = 2 }
         listOf(
             "Speed  ${playbackSpeed}×" to { playbackSpeed = when (playbackSpeed) { 1f -> 1.25f; 1.25f -> 1.5f; 1.5f -> 2f; else -> 1f }; player?.playbackParameters = PlaybackParameters(playbackSpeed); buildPlaybackUi(video) },
+            "Convert to MP3" to { convertToMp3(video) },
             "Audio extract" to { extractAudio(video) },
             "Video info" to { showInfo(video) },
             "Screen rotate" to { landscape = !landscape; requestedOrientation = if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
@@ -286,12 +289,13 @@ class VideoActivity : Activity() {
     private fun showVideoTools(video: LocalVideo) {
         AlertDialog.Builder(this)
             .setTitle(video.title)
-            .setItems(arrayOf("Play video", "Extract audio to M4A", "Video details", "Share video")) { _, which ->
+            .setItems(arrayOf("Play video", "Convert to MP3", "Extract audio to M4A", "Video details", "Share video")) { _, which ->
                 when (which) {
                     0 -> playVideo(video)
-                    1 -> extractAudio(video)
-                    2 -> showInfo(video)
-                    3 -> shareVideo(video)
+                    1 -> convertToMp3(video)
+                    2 -> extractAudio(video)
+                    3 -> showInfo(video)
+                    4 -> shareVideo(video)
                 }
             }.show()
     }
@@ -311,6 +315,54 @@ class VideoActivity : Activity() {
             }, "Share video"))
         } catch (_: Exception) {
             Toast.makeText(this, "No app available to share this video.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun convertToMp3(video: LocalVideo) {
+        Toast.makeText(this, "Converting video audio to MP3 on this device…", Toast.LENGTH_LONG).show()
+        Thread {
+            var input: File? = null
+            try {
+                input = File(cacheDir, "laczek_video_${System.nanoTime()}.mp4")
+                contentResolver.openInputStream(video.uri).use { source ->
+                    if (source == null) throw IllegalStateException("Cannot read this video.")
+                    input.outputStream().use { target -> source.copyTo(target) }
+                }
+                val directory = getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: filesDir
+                if (!directory.exists()) directory.mkdirs()
+                val output = File(directory, "LaCzek-${video.id.takeIf { it >= 0 } ?: System.currentTimeMillis()}.mp3")
+                val command = "-y -i ${input.absolutePath} -vn -codec:a libmp3lame -q:a 2 ${output.absolutePath}"
+                FFmpegKit.executeAsync(command) { session ->
+                    val success = ReturnCode.isSuccess(session.returnCode) && output.exists() && output.length() > 0L
+                    runOnUiThread {
+                        if (success) {
+                            AlertDialog.Builder(this).setTitle("MP3 ready")
+                                .setMessage("Converted locally. No upload required.\n\n${output.absolutePath}")
+                                .setPositiveButton("Share MP3") { _, _ -> shareAudio(output) }
+                                .setNegativeButton("Close", null).show()
+                        } else {
+                            Toast.makeText(this, "MP3 conversion failed. This file may contain an unsupported audio stream.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    input?.delete()
+                }
+            } catch (e: Exception) {
+                input?.delete()
+                runOnUiThread { Toast.makeText(this, "Could not convert to MP3: ${e.message ?: "file access error"}", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
+    }
+
+    private fun shareAudio(file: File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "audio/mpeg"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }, "Share MP3"))
+        } catch (_: Exception) {
+            Toast.makeText(this, "MP3 saved in LaCzek Player's Music folder.", Toast.LENGTH_LONG).show()
         }
     }
 
