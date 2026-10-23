@@ -27,5 +27,6 @@ dependencies {
     implementation("androidx.media3:media3-session:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("androidx.core:core:1.15.0")
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-audio:8.1.7")
 }
