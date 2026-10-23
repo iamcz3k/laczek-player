@@ -323,15 +323,16 @@ class VideoActivity : Activity() {
         Thread {
             var input: File? = null
             try {
-                input = File(cacheDir, "laczek_video_${System.nanoTime()}.mp4")
+                val inputFile = File(cacheDir, "laczek_video_${System.nanoTime()}.mp4")
+                input = inputFile
                 contentResolver.openInputStream(video.uri).use { source ->
                     if (source == null) throw IllegalStateException("Cannot read this video.")
-                    input.outputStream().use { target -> source.copyTo(target) }
+                    inputFile.outputStream().use { target -> source.copyTo(target) }
                 }
                 val directory = getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: filesDir
                 if (!directory.exists()) directory.mkdirs()
                 val output = File(directory, "LaCzek-${video.id.takeIf { it >= 0 } ?: System.currentTimeMillis()}.mp3")
-                val command = "-y -i ${input.absolutePath} -vn -codec:a libmp3lame -q:a 2 ${output.absolutePath}"
+                val command = "-y -i ${inputFile.absolutePath} -vn -codec:a libmp3lame -q:a 2 ${output.absolutePath}"
                 FFmpegKit.executeAsync(command) { session ->
                     val success = ReturnCode.isSuccess(session.returnCode) && output.exists() && output.length() > 0L
                     runOnUiThread {
@@ -344,7 +345,7 @@ class VideoActivity : Activity() {
                             Toast.makeText(this, "MP3 conversion failed. This file may contain an unsupported audio stream.", Toast.LENGTH_LONG).show()
                         }
                     }
-                    input?.delete()
+                    inputFile.delete()
                 }
             } catch (e: Exception) {
                 input?.delete()
@@ -372,43 +373,44 @@ class VideoActivity : Activity() {
             var extractor: MediaExtractor? = null
             var muxer: MediaMuxer? = null
             var started = false
-            var output: File? = null
             try {
-                extractor = MediaExtractor()
-                extractor.setDataSource(this, video.uri, null)
+                val extractorInstance = MediaExtractor()
+                extractor = extractorInstance
+                extractorInstance.setDataSource(this, video.uri, null)
                 var audioTrack = -1
-                for (i in 0 until extractor.trackCount) {
-                    val format = extractor.getTrackFormat(i)
+                for (i in 0 until extractorInstance.trackCount) {
+                    val format = extractorInstance.getTrackFormat(i)
                     if (format.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) { audioTrack = i; break }
                 }
                 if (audioTrack < 0) throw IllegalStateException("This video has no audio track.")
-                val format = extractor.getTrackFormat(audioTrack)
-                extractor.selectTrack(audioTrack)
+                val format = extractorInstance.getTrackFormat(audioTrack)
+                extractorInstance.selectTrack(audioTrack)
                 val dir = getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: filesDir
                 if (!dir.exists()) dir.mkdirs()
-                output = File(dir, video.title.replace(Regex("[^A-Za-z0-9._ -]"), "_") + "-audio.m4a")
-                muxer = MediaMuxer(output.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-                muxer.addTrack(format)
-                muxer.start()
+                val outputFile = File(dir, video.title.replace(Regex("[^A-Za-z0-9._ -]"), "_") + "-audio.m4a")
+                val muxerInstance = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                muxer = muxerInstance
+                val outputTrack = muxerInstance.addTrack(format)
+                muxerInstance.start()
                 started = true
                 val buffer = java.nio.ByteBuffer.allocate(1024 * 1024)
                 val info = android.media.MediaCodec.BufferInfo()
                 while (true) {
                     buffer.clear()
-                    val size = extractor.readSampleData(buffer, 0)
+                    val size = extractorInstance.readSampleData(buffer, 0)
                     if (size < 0) break
                     info.offset = 0
                     info.size = size
-                    info.presentationTimeUs = extractor.sampleTime
-                    info.flags = extractor.sampleFlags
-                    muxer.writeSampleData(0, buffer, info)
-                    extractor.advance()
+                    info.presentationTimeUs = extractorInstance.sampleTime
+                    info.flags = extractorInstance.sampleFlags
+                    muxerInstance.writeSampleData(outputTrack, buffer, info)
+                    extractorInstance.advance()
                 }
-                muxer.stop()
+                muxerInstance.stop()
                 started = false
                 runOnUiThread {
                     AlertDialog.Builder(this).setTitle("Audio extracted")
-                        .setMessage("Saved audio as M4A/AAC:\n${output.absolutePath}\n\nThis keeps the original audio track without re-encoding.")
+                        .setMessage("Saved audio as M4A/AAC:\n${outputFile.absolutePath}\n\nThis keeps the original audio track without re-encoding.")
                         .setPositiveButton("OK", null).show()
                 }
             } catch (e: Exception) {
