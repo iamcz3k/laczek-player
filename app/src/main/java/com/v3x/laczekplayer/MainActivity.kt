@@ -653,22 +653,35 @@ class MainActivity : Activity() {
         text = label
         textSize = 13f
         isAllCaps = false
+        letterSpacing = .015f
         setTextColor(fg)
-        backgroundTintList = android.content.res.ColorStateList.valueOf(panel)
+        background = roundedBackground(panel, dp(15))
+        backgroundTintList = null
         stateListAnimator = null
+        minHeight = dp(42)
+        minimumHeight = dp(42)
+        setPadding(dp(12), dp(5), dp(12), dp(5))
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setOnClickListener {
             animate().cancel()
-            animate().scaleX(0.96f).scaleY(0.96f).setDuration(65L).withEndAction {
-                animate().scaleX(1f).scaleY(1f).setDuration(105L).start()
+            animate().scaleX(0.965f).scaleY(0.965f).setDuration(65L).withEndAction {
+                animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
                 action()
             }.start()
         }
     }
 
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
-        setColor(color)
+        if (color == orange) {
+            orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
+            colors = intArrayOf(Color.rgb(190, 158, 255), Color.rgb(126, 70, 247))
+        } else {
+            setColor(color)
+        }
         cornerRadius = radius.toFloat()
-        if (dark && color != Color.TRANSPARENT && color != bg) setStroke(dp(1), Color.argb(52, 157, 104, 255))
+        if (dark && color != Color.TRANSPARENT && color != bg) {
+            setStroke(dp(1), if (color == orange) Color.argb(220, 210, 186, 255) else Color.argb(62, 157, 104, 255))
+        }
     }
 
     private fun hasAudioPermission(): Boolean {
