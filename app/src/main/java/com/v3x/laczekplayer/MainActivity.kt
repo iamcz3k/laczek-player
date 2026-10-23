@@ -474,11 +474,12 @@ class MainActivity : Activity() {
             letterSpacing = -.035f
         })
         brandColumn.addView(TextView(this).apply {
-            text = "PLAYER  •  MUSIC + VIDEO"
-            textSize = 10f
-            letterSpacing = .16f
+            text = "PLAYER"
+            textSize = 11f
+            letterSpacing = .24f
             setTextColor(orange)
-            setPadding(0, dp(2), 0, 0)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(1), 0, 0)
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(actionButton(if (selectionMode) "Done" else "Select") {
