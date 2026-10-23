@@ -340,8 +340,9 @@ class VideoActivity : Activity() {
                 muxer.start()
                 started = true
                 val buffer = java.nio.ByteBuffer.allocate(1024 * 1024)
-                val info = MediaMuxer.BufferInfo()
+                val info = android.media.MediaCodec.BufferInfo()
                 while (true) {
+                    buffer.clear()
                     val size = extractor.readSampleData(buffer, 0)
                     if (size < 0) break
                     info.offset = 0
