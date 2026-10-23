@@ -120,7 +120,7 @@ class VideoActivity : Activity() {
             textSize = 14f
             setTextColor(white)
             setHintTextColor(muted)
-            singleLine = true
+            isSingleLine = true
             setPadding(dp(16), 0, dp(16), 0)
             background = card()
             addTextChangedListener(object : android.text.TextWatcher {
