@@ -245,7 +245,7 @@ class VideoActivity : Activity() {
     private fun buildPlaybackUi(video: LocalVideo) {
         root.removeAllViews()
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        top.addView(button("‹ Library") { player?.pause(); buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+        top.addView(button("‹ Library") { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
         top.addView(button("⋮ Tools") { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
         root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         playerView = PlayerView(this).apply {
@@ -413,6 +413,7 @@ class VideoActivity : Activity() {
     override fun onBackPressed() {
         if (player != null && root.childCount > 0 && playerView != null) {
             player?.pause()
+            playerView?.player = null
             playerView = null
             buildLibraryUi()
             renderVideos()
