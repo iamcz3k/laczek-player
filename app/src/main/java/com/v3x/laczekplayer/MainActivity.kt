@@ -108,12 +108,12 @@ class MainActivity : Activity() {
     private lateinit var miniArtistLabel: TextView
     private lateinit var miniPlayButton: Button
     private var fullPlayerOpen = false
-    private var accentColor = Color.rgb(255, 138, 61)
+    private var accentColor = Color.rgb(157, 104, 255)
     private val orange get() = accentColor
-    private val bg get() = if (dark) Color.rgb(15, 16, 20) else Color.rgb(247, 247, 250)
-    private val panel get() = if (dark) Color.rgb(30, 32, 39) else Color.rgb(231, 232, 238)
-    private val fg get() = if (dark) Color.rgb(245, 245, 248) else Color.rgb(24, 25, 30)
-    private val muted get() = if (dark) Color.rgb(165, 169, 181) else Color.rgb(95, 97, 108)
+    private val bg get() = if (dark) Color.rgb(7, 6, 12) else Color.rgb(247, 245, 252)
+    private val panel get() = if (dark) Color.rgb(22, 19, 32) else Color.rgb(235, 230, 247)
+    private val fg get() = if (dark) Color.rgb(250, 248, 255) else Color.rgb(25, 20, 36)
+    private val muted get() = if (dark) Color.rgb(174, 164, 199) else Color.rgb(103, 91, 126)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,7 +129,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
         dark = prefs.getBoolean("dark", true)
-        accentColor = prefs.getInt("accent", Color.rgb(255, 138, 61))
+        accentColor = prefs.getInt("accent", Color.rgb(157, 104, 255)).let { if (it == Color.rgb(255, 138, 61)) Color.rgb(157, 104, 255) else it }
         hiddenFolders.addAll(prefs.getStringSet("hidden_folders", emptySet()) ?: emptySet())
         sortMode = prefs.getString("sort", "Title") ?: "Title"
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
@@ -459,19 +459,25 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(6), 0, dp(14))
         }
+        val brandMark = ImageView(this).apply {
+            setImageResource(R.drawable.ic_laczek_airpod)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "LaCzek Player AirPod logo"
+        }
+        header.addView(brandMark, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginEnd = dp(10) })
         val brandColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brandColumn.addView(TextView(this).apply {
             text = "LaCzek"
             textSize = 27f
-            setTextColor(fg)
+            setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
-            letterSpacing = -.025f
+            letterSpacing = -.035f
         })
         brandColumn.addView(TextView(this).apply {
-            text = "YOUR MUSIC, OFFLINE."
+            text = "PLAYER  •  MUSIC + VIDEO"
             textSize = 10f
             letterSpacing = .16f
-            setTextColor(muted)
+            setTextColor(orange)
             setPadding(0, dp(2), 0, 0)
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, -2, 1f))
@@ -480,6 +486,13 @@ class MainActivity : Activity() {
             if (selectionMode) { section = "Songs"; currentPlaylist = null } else selectedTrackIds.clear()
             renderLibrary(); buildUiSelectionRefresh()
         }.apply { textSize = 12f; setPadding(dp(7), 0, dp(7), 0); minWidth = dp(58); minimumWidth = dp(58); minHeight = dp(44); minimumHeight = dp(44); background = roundedBackground(panel, dp(14)) })
+        header.addView(actionButton("▣") { startActivity(Intent(this, VideoActivity::class.java)) }.apply {
+            textSize = 19f
+            background = roundedBackground(panel, dp(16))
+            minWidth = dp(46); minimumWidth = dp(46)
+            minHeight = dp(46); minimumHeight = dp(46)
+            contentDescription = "Open local videos"
+        })
         header.addView(actionButton("⚙") { showMoreMenu() }.apply {
             textSize = 20f
             background = roundedBackground(panel, dp(16))
@@ -654,6 +667,7 @@ class MainActivity : Activity() {
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
         setColor(color)
         cornerRadius = radius.toFloat()
+        if (dark && color != Color.TRANSPARENT && color != bg) setStroke(dp(1), Color.argb(52, 157, 104, 255))
     }
 
     private fun hasAudioPermission(): Boolean {
