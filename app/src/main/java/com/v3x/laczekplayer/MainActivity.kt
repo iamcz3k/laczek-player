@@ -108,12 +108,12 @@ class MainActivity : Activity() {
     private lateinit var miniArtistLabel: TextView
     private lateinit var miniPlayButton: Button
     private var fullPlayerOpen = false
-    private var accentColor = Color.rgb(255, 138, 61)
+    private var accentColor = Color.rgb(157, 104, 255)
     private val orange get() = accentColor
-    private val bg get() = if (dark) Color.rgb(15, 16, 20) else Color.rgb(247, 247, 250)
-    private val panel get() = if (dark) Color.rgb(30, 32, 39) else Color.rgb(231, 232, 238)
-    private val fg get() = if (dark) Color.rgb(245, 245, 248) else Color.rgb(24, 25, 30)
-    private val muted get() = if (dark) Color.rgb(165, 169, 181) else Color.rgb(95, 97, 108)
+    private val bg get() = if (dark) Color.rgb(7, 6, 12) else Color.rgb(247, 245, 252)
+    private val panel get() = if (dark) Color.rgb(22, 19, 32) else Color.rgb(235, 230, 247)
+    private val fg get() = if (dark) Color.rgb(250, 248, 255) else Color.rgb(25, 20, 36)
+    private val muted get() = if (dark) Color.rgb(174, 164, 199) else Color.rgb(103, 91, 126)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,7 +129,7 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
         favorites.addAll(prefs.getStringSet("favorites", emptySet()) ?: emptySet())
         dark = prefs.getBoolean("dark", true)
-        accentColor = prefs.getInt("accent", Color.rgb(255, 138, 61))
+        accentColor = prefs.getInt("accent", Color.rgb(157, 104, 255)).let { if (it == Color.rgb(255, 138, 61)) Color.rgb(157, 104, 255) else it }
         hiddenFolders.addAll(prefs.getStringSet("hidden_folders", emptySet()) ?: emptySet())
         sortMode = prefs.getString("sort", "Title") ?: "Title"
         readStringMap(prefs.getString("custom_titles", "{}"), customTitles)
@@ -459,20 +459,27 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(6), 0, dp(14))
         }
+        val brandMark = ImageView(this).apply {
+            setImageResource(R.drawable.ic_laczek_airpod)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "LaCzek Player AirPod logo"
+        }
+        header.addView(brandMark, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginEnd = dp(10) })
         val brandColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         brandColumn.addView(TextView(this).apply {
             text = "LaCzek"
             textSize = 27f
-            setTextColor(fg)
+            setTextColor(Color.WHITE)
             setTypeface(null, android.graphics.Typeface.BOLD)
-            letterSpacing = -.025f
+            letterSpacing = -.035f
         })
         brandColumn.addView(TextView(this).apply {
-            text = "YOUR MUSIC, OFFLINE."
-            textSize = 10f
-            letterSpacing = .16f
-            setTextColor(muted)
-            setPadding(0, dp(2), 0, 0)
+            text = "PLAYER"
+            textSize = 11f
+            letterSpacing = .24f
+            setTextColor(orange)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(1), 0, 0)
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(actionButton(if (selectionMode) "Done" else "Select") {
@@ -504,35 +511,48 @@ class MainActivity : Activity() {
         searchRow.addView(actionButton("Filters") { showAdvancedSearch() }.apply { textSize = 12f; background = roundedBackground(panel, dp(16)); minWidth = dp(78); minimumWidth = dp(78); minHeight = dp(48); minimumHeight = dp(48) })
         root.addView(searchRow, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
-        val navScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-        }
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(12))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, dp(4))
         }
-        listOf("Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years",
-            "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
-            "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists").forEach { name ->
-            val selected = section == name
-            nav.addView(actionButton(name) {
-                section = name
-                currentPlaylist = null
-                renderLibrary()
-                buildNavSelection(nav)
+        listOf(
+            Triple("⌂\nHome", "Songs", "Library"),
+            Triple("♥\nLikes", "Favorites", "Favorites"),
+            Triple("▤\nLists", "Playlists", "Playlists"),
+            Triple("▦\nAlbums", "Albums", "Albums"),
+            Triple("▶\nVideo", "VIDEO", "Video library"),
+            Triple("•••\nMore", "MORE", "More library sections")
+        ).forEach { (label, destination, description) ->
+            val selected = if (destination == "Songs") section !in setOf("Favorites", "Playlists", "Albums") else destination == section
+            nav.addView(actionButton(label) {
+                when (destination) {
+                    "VIDEO" -> startActivity(Intent(this, VideoActivity::class.java))
+                    "MORE" -> showSectionsMenu(nav)
+                    else -> {
+                        section = destination
+                        currentPlaylist = null
+                        renderLibrary()
+                        buildNavSelection(nav)
+                    }
+                }
             }.apply {
-                textSize = 12f
-                setPadding(dp(15), 0, dp(15), 0)
-                minHeight = dp(38); minimumHeight = dp(38)
-                background = roundedBackground(if (selected) orange else panel, dp(20))
-                setTextColor(if (selected) Color.BLACK else fg)
+                tag = destination
+                textSize = 10f
+                maxLines = 2
+                gravity = Gravity.CENTER
+                setPadding(dp(1), dp(3), dp(1), dp(3))
+                minWidth = 0; minimumWidth = 0
+                minHeight = dp(52); minimumHeight = dp(52)
+                background = roundedBackground(if (selected) orange else panel, dp(15))
+                setTextColor(if (selected) Color.BLACK else muted)
+                contentDescription = description
                 stateListAnimator = null
-            }, LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(7) })
+            }, LinearLayout.LayoutParams(0, dp(54), 1f).apply {
+                marginStart = dp(2)
+                marginEnd = dp(2)
+            })
         }
-        navScroll.addView(nav)
-        root.addView(navScroll)
 
         status = TextView(this).apply {
             textSize = 12f
@@ -610,6 +630,9 @@ class MainActivity : Activity() {
         miniPlayerPanel = miniPlayer
         applyMiniPartyMode()
         root.addView(miniPlayer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        root.addView(View(this).apply { setBackgroundColor(Color.argb(70, 157, 104, 255)) },
+            LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(10) })
+        root.addView(nav, LinearLayout.LayoutParams(-1, dp(62)))
 
         setContentView(root)
         root.alpha = 0.94f; root.translationY = dp(8).toFloat()
@@ -629,31 +652,61 @@ class MainActivity : Activity() {
     private fun buildNavSelection(nav: LinearLayout) {
         for (i in 0 until nav.childCount) {
             val view = nav.getChildAt(i) as? Button ?: continue
-            val selected = view.text.toString() == section
-            view.background = roundedBackground(if (selected) orange else panel, dp(20))
-            view.setTextColor(if (selected) Color.BLACK else fg)
+            val destination = view.tag as? String ?: continue
+            val selected = if (destination == "Songs") section !in setOf("Favorites", "Playlists", "Albums") else destination == section
+            view.background = roundedBackground(if (selected) orange else panel, dp(15))
+            view.setTextColor(if (selected) Color.BLACK else muted)
         }
+    }
+
+    private fun showSectionsMenu(nav: LinearLayout) {
+        val sections = listOf(
+            "Songs", "Albums", "Artists", "Featured artists", "Folders", "Genres", "Composers", "Years",
+            "Formats", "Recent", "Recently added", "Unplayed", "Most played", "Top rated",
+            "Longest", "Shortest", "Large files", "Rated", "Duplicates", "Favorites", "Playlists"
+        )
+        AlertDialog.Builder(this).setTitle("Browse library")
+            .setItems(sections.toTypedArray()) { _, which ->
+                section = sections[which]
+                currentPlaylist = null
+                renderLibrary()
+                buildNavSelection(nav)
+            }.show()
     }
 
     private fun actionButton(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
         textSize = 13f
         isAllCaps = false
+        letterSpacing = .015f
         setTextColor(fg)
-        backgroundTintList = android.content.res.ColorStateList.valueOf(panel)
+        background = roundedBackground(panel, dp(15))
+        backgroundTintList = null
         stateListAnimator = null
+        minHeight = dp(42)
+        minimumHeight = dp(42)
+        setPadding(dp(12), dp(5), dp(12), dp(5))
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setOnClickListener {
             animate().cancel()
-            animate().scaleX(0.96f).scaleY(0.96f).setDuration(65L).withEndAction {
-                animate().scaleX(1f).scaleY(1f).setDuration(105L).start()
+            animate().scaleX(0.965f).scaleY(0.965f).setDuration(65L).withEndAction {
+                animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
                 action()
             }.start()
         }
     }
 
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
-        setColor(color)
+        if (color == orange) {
+            orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
+            colors = intArrayOf(Color.rgb(190, 158, 255), Color.rgb(126, 70, 247))
+        } else {
+            setColor(color)
+        }
         cornerRadius = radius.toFloat()
+        if (dark && color != Color.TRANSPARENT && color != bg) {
+            setStroke(dp(1), if (color == orange) Color.argb(220, 210, 186, 255) else Color.argb(62, 157, 104, 255))
+        }
     }
 
     private fun hasAudioPermission(): Boolean {
