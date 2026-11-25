@@ -260,7 +260,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(4), 0, dp(18))
         }
-        top.addView(actionButton("⌄") { showLibraryScreen() }.apply {
+        top.addView(iconActionButton(R.drawable.ic_arrow_back, "Back to library") { showLibraryScreen() }.apply {
             textSize = 27f
             background = roundedBackground(panel, dp(17))
             minWidth = dp(48); minimumWidth = dp(48)
@@ -287,7 +287,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(3), 0, 0)
         })
         top.addView(heading, LinearLayout.LayoutParams(0, -2, 1f))
-        top.addView(actionButton("⋮") {
+        top.addView(iconActionButton(R.drawable.ic_more_vert, "Track menu") {
             controller?.currentMediaItem?.mediaId?.let { id ->
                 tracks.firstOrNull { it.id.toString() == id }?.let { showTrackMenu(it) }
             }
@@ -369,13 +369,13 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, dp(18), 0, dp(18))
         }
-        controls.addView(actionButton("⏮") { skip(-1) }.apply {
+        controls.addView(iconActionButton(R.drawable.ic_skip_previous, "Previous track") { skip(-1) }.apply {
             textSize = 23f; background = roundedBackground(panel, dp(20))
         }, LinearLayout.LayoutParams(dp(52), dp(52)).apply { marginEnd = dp(10) })
         controls.addView(actionButton("−15") { controller?.let { it.seekTo((it.currentPosition - 15000).coerceAtLeast(0)) } }.apply {
             textSize = 12f; background = roundedBackground(panel, dp(18))
         }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(10) })
-        playButton = actionButton("▶") { togglePlayback() }.apply {
+        playButton = iconActionButton(R.drawable.ic_play_arrow, "Play or pause") { togglePlayback() }.apply {
             textSize = 26f
             setTextColor(Color.BLACK)
             background = roundedBackground(orange, dp(25))
@@ -384,7 +384,7 @@ class MainActivity : Activity() {
         controls.addView(actionButton("+15") { controller?.let { it.seekTo((it.currentPosition + 15000).coerceAtMost(it.duration.coerceAtLeast(0))) } }.apply {
             textSize = 12f; background = roundedBackground(panel, dp(18))
         }, LinearLayout.LayoutParams(dp(48), dp(52)).apply { marginEnd = dp(10) })
-        controls.addView(actionButton("⏭") { skip(1) }.apply {
+        controls.addView(iconActionButton(R.drawable.ic_skip_next, "Next track") { skip(1) }.apply {
             textSize = 23f; background = roundedBackground(panel, dp(20))
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         body.addView(controls)
@@ -630,7 +630,7 @@ class MainActivity : Activity() {
         miniLabels.addView(miniTrackLabel)
         miniLabels.addView(miniArtistLabel)
         miniPlayer.addView(miniLabels, LinearLayout.LayoutParams(0, -2, 1f))
-        miniPlayButton = actionButton("▶") { togglePlayback() }.apply {
+        miniPlayButton = iconActionButton(R.drawable.ic_play_arrow, "Play or pause") { togglePlayback() }.apply {
             textSize = 20f
             setTextColor(orange)
             background = roundedBackground(bg, dp(16))
@@ -687,6 +687,24 @@ class MainActivity : Activity() {
                 renderLibrary()
                 buildNavSelection(nav)
             }.show()
+    }
+
+    private fun iconActionButton(iconRes: Int, description: String, action: () -> Unit): Button =
+        actionButton("", action).apply {
+            val icon = getDrawable(iconRes)?.mutate()
+            icon?.setTint(fg)
+            icon?.setBounds(0, 0, dp(24), dp(24))
+            setCompoundDrawables(icon, null, null, null)
+            contentDescription = description
+        }
+
+    private fun setPlaybackIcon(button: Button, playing: Boolean, tint: Int) {
+        button.text = ""
+        val icon = getDrawable(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow)?.mutate()
+        icon?.setTint(tint)
+        icon?.setBounds(0, 0, dp(28), dp(28))
+        button.setCompoundDrawables(icon, null, null, null)
+        button.contentDescription = if (playing) "Pause" else "Play"
     }
 
     private fun actionButton(label: String, action: () -> Unit): Button = Button(this).apply {
@@ -1448,7 +1466,7 @@ class MainActivity : Activity() {
         if (::miniTrackLabel.isInitialized) {
             miniTrackLabel.text = item?.mediaMetadata?.title?.toString() ?: ""
             miniArtistLabel.text = item?.mediaMetadata?.artist?.toString() ?: ""
-            miniPlayButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+            setPlaybackIcon(miniPlayButton, p?.isPlaying == true, orange)
             try {
                 val track = tracks.firstOrNull { it.id.toString() == item?.mediaId }
                 val art = track?.let { artworkUri(it) }
@@ -1469,7 +1487,7 @@ class MainActivity : Activity() {
         if (!fullPlayerOpen || !::nowPlaying.isInitialized || !::playButton.isInitialized ||
             !::artworkView.isInitialized || !::seek.isInitialized || !::timeText.isInitialized) return
         nowPlaying.text = item?.mediaMetadata?.title?.toString() ?: "Unknown title"
-        playButton.text = if (p?.isPlaying == true) "Ⅱ" else "▶"
+        setPlaybackIcon(playButton, p?.isPlaying == true, Color.BLACK)
         val currentTrack = tracks.firstOrNull { it.id.toString() == item?.mediaId }
         try { val art = currentTrack?.let { artworkUri(it) }; if (art != null) artworkView.setImageURI(art) else artworkView.setImageDrawable(null) } catch (_: Exception) { artworkView.setImageDrawable(null) }
         val duration = p?.duration?.takeIf { it > 0 } ?: 0L
