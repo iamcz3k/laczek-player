@@ -1621,7 +1621,7 @@ class MainActivity : Activity() {
         val artworkColors = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("artwork_colors", true)
         val skipSilence = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("skip_silence_enabled", false)
         val partyMode = getSharedPreferences("laczek_player", MODE_PRIVATE).getBoolean("mini_party_mode", false)
-        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Accent colour", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
+        val options = arrayOf("Rescan library", "Sort: $sortMode", "Create playlist", "Import local audio", "Import M3U playlist", "Sleep timer", "Theme: ${if (dark) "Dark" else "Light"}", "Export settings backup", "Restore settings backup", "Clear listening history", "Playlist overview", "Appearance & themes", "Hidden folders", "Save queue for later", "Restore saved queue", "Listening statistics", "Resume last track", "Export library index (CSV)", "Advanced search filters", "Crossfade: ${if (crossfade) "On" else "Off"}", "Artwork-based colours: ${if (artworkColors) "On" else "Off"}", "Toggle multi-select", "Minimum file size/duration filters", "Skip silence preference", "Mini-player party mode")
         showActionSheet("LaCzek tools", "Offline music library and player settings", options.map { it to "" }) { which ->
             when (which) {
                 0 -> scanLibrary()
@@ -1635,7 +1635,7 @@ class MainActivity : Activity() {
                 8 -> importBackup()
                 9 -> clearListeningHistory()
                 10 -> showPlaylistOverview()
-                11 -> chooseAccentColour()
+                11 -> startActivity(Intent(this, ThemeActivity::class.java))
                 12 -> manageHiddenFolders()
                 13 -> saveQueueForLater()
                 14 -> restoreSavedQueue()
@@ -1716,14 +1716,7 @@ class MainActivity : Activity() {
         return "${hours}h ${minutes}m"
     }
 
-    private fun chooseAccentColour() {
-        val names = arrayOf("LaCzek orange", "Cyan", "Purple", "Green", "Pink", "Blue", "White")
-        val colours = intArrayOf(Color.rgb(255, 138, 61), Color.rgb(0, 210, 220), Color.rgb(174, 106, 255), Color.rgb(68, 205, 120), Color.rgb(255, 90, 160), Color.rgb(75, 145, 255), Color.WHITE)
-        val selected = colours.indexOf(accentColor).coerceAtLeast(0)
-        AlertDialog.Builder(this).setTitle("Accent colour").setSingleChoiceItems(names, selected) { dialog, which ->
-            accentColor = colours[which]; saveLocalSettings(); rebuildUi(); dialog.dismiss()
-        }.setNegativeButton("Cancel", null).show()
-    }
+    private fun chooseAccentColour() { startActivity(Intent(this, ThemeActivity::class.java)) }
 
     private fun manageHiddenFolders() {
         val folders = tracks.map { it.path }.distinct().sorted().toTypedArray()
