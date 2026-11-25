@@ -2420,9 +2420,18 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        val savedFavorites = getSharedPreferences("laczek_player", MODE_PRIVATE).getStringSet("favorites", emptySet()) ?: emptySet()
+        val prefs = getSharedPreferences("laczek_player", MODE_PRIVATE)
+        val savedFavorites = prefs.getStringSet("favorites", emptySet()) ?: emptySet()
         favorites.clear(); favorites.addAll(savedFavorites)
-        if (::songList.isInitialized) renderLibrary()
+        val savedDark = prefs.getBoolean("dark", true)
+        val savedAccent = prefs.getInt("accent", Color.rgb(157, 104, 255))
+        if (dark != savedDark || accentColor != savedAccent) {
+            dark = savedDark
+            accentColor = savedAccent
+            rebuildUi()
+        } else if (::songList.isInitialized) {
+            renderLibrary()
+        }
         updatePlaybackUi()
     }
 
