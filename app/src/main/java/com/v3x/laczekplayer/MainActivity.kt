@@ -487,8 +487,11 @@ class MainActivity : Activity() {
             if (selectionMode) { section = "Songs"; currentPlaylist = null } else selectedTrackIds.clear()
             renderLibrary(); buildUiSelectionRefresh()
         }.apply { textSize = 12f; setPadding(dp(7), 0, dp(7), 0); minWidth = dp(58); minimumWidth = dp(58); minHeight = dp(44); minimumHeight = dp(44); background = roundedBackground(panel, dp(14)) })
-        header.addView(actionButton("⚙") { showMoreMenu() }.apply {
-            textSize = 20f
+        header.addView(actionButton("") { showMoreMenu() }.apply {
+            val icon = getDrawable(R.drawable.ic_nav_settings)?.mutate()
+            icon?.setTint(fg)
+            setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null)
+            contentDescription = "Settings"
             background = roundedBackground(panel, dp(16))
             minWidth = dp(48); minimumWidth = dp(48)
             minHeight = dp(48); minimumHeight = dp(48)
@@ -517,12 +520,12 @@ class MainActivity : Activity() {
             setPadding(0, dp(8), 0, dp(4))
         }
         listOf(
-            Triple("⌂\nHome", "Songs", "Library"),
-            Triple("♥\nLikes", "Favorites", "Favorites"),
-            Triple("▤\nLists", "Playlists", "Playlists"),
-            Triple("▦\nAlbums", "Albums", "Albums"),
-            Triple("▶\nVideo", "VIDEO", "Video library"),
-            Triple("•••\nMore", "MORE", "More library sections")
+            Triple("Home", "Songs", "Library"),
+            Triple("Likes", "Favorites", "Favorites"),
+            Triple("Playlists", "Playlists", "Playlists"),
+            Triple("Albums", "Albums", "Albums"),
+            Triple("Video", "VIDEO", "Video library"),
+            Triple("More", "MORE", "More library sections")
         ).forEach { (label, destination, description) ->
             val selected = if (destination == "Songs") section !in setOf("Favorites", "Playlists", "Albums") else destination == section
             nav.addView(actionButton(label) {
@@ -546,6 +549,18 @@ class MainActivity : Activity() {
                 minHeight = dp(52); minimumHeight = dp(52)
                 background = roundedBackground(if (selected) orange else panel, dp(15))
                 setTextColor(if (selected) Color.BLACK else muted)
+                val iconRes = when (destination) {
+                    "Songs" -> R.drawable.ic_nav_home
+                    "Favorites" -> R.drawable.ic_nav_favorite
+                    "Playlists" -> R.drawable.ic_nav_playlist
+                    "Albums" -> R.drawable.ic_nav_album
+                    "VIDEO" -> R.drawable.ic_nav_video
+                    else -> R.drawable.ic_nav_more
+                }
+                val icon = getDrawable(iconRes)?.mutate()
+                icon?.setTint(if (selected) Color.BLACK else muted)
+                setCompoundDrawablesWithIntrinsicBounds(null, icon, null, null)
+                compoundDrawablePadding = dp(2)
                 contentDescription = description
                 stateListAnimator = null
             }, LinearLayout.LayoutParams(0, dp(54), 1f).apply {
