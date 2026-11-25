@@ -110,10 +110,10 @@ class MainActivity : Activity() {
     private var fullPlayerOpen = false
     private var accentColor = Color.rgb(157, 104, 255)
     private val orange get() = accentColor
-    private val bg get() = if (dark) Color.rgb(7, 6, 12) else Color.rgb(247, 245, 252)
-    private val panel get() = if (dark) Color.rgb(22, 19, 32) else Color.rgb(235, 230, 247)
+    private val bg get() = if (dark) Color.BLACK else Color.rgb(247, 245, 252)
+    private val panel get() = if (dark) Color.rgb(29, 27, 35) else Color.rgb(235, 230, 240)
     private val fg get() = if (dark) Color.rgb(250, 248, 255) else Color.rgb(25, 20, 36)
-    private val muted get() = if (dark) Color.rgb(174, 164, 199) else Color.rgb(103, 91, 126)
+    private val muted get() = if (dark) Color.rgb(202, 196, 208) else Color.rgb(73, 69, 79)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -695,11 +695,15 @@ class MainActivity : Activity() {
         isAllCaps = false
         letterSpacing = .015f
         setTextColor(fg)
-        background = roundedBackground(panel, dp(15))
+        background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(Color.argb(42, accentColor)),
+            roundedBackground(panel, dp(19)),
+            roundedBackground(Color.WHITE, dp(19))
+        )
         backgroundTintList = null
         stateListAnimator = null
-        minHeight = dp(42)
-        minimumHeight = dp(42)
+        minHeight = dp(48)
+        minimumHeight = dp(48)
         setPadding(dp(12), dp(5), dp(12), dp(5))
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setOnClickListener {
@@ -712,15 +716,10 @@ class MainActivity : Activity() {
     }
 
     private fun roundedBackground(color: Int, radius: Int) = android.graphics.drawable.GradientDrawable().apply {
-        if (color == orange) {
-            orientation = android.graphics.drawable.GradientDrawable.Orientation.TL_BR
-            colors = intArrayOf(Color.rgb(190, 158, 255), Color.rgb(126, 70, 247))
-        } else {
-            setColor(color)
-        }
+        setColor(color)
         cornerRadius = radius.toFloat()
         if (dark && color != Color.TRANSPARENT && color != bg) {
-            setStroke(dp(1), if (color == orange) Color.argb(220, 210, 186, 255) else Color.argb(62, 157, 104, 255))
+            setStroke(dp(1), if (color == orange) Color.argb(170, 255, 255, 255) else Color.argb(42, accentColor))
         }
     }
 
