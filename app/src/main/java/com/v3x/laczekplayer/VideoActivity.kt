@@ -630,7 +630,11 @@ class VideoActivity : Activity() {
     @Deprecated("Use Activity Result APIs when modernizing")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 403 && resultCode == RESULT_OK) {
+        if (requestCode == 404 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            applyExternalSubtitle(uri)
+        } else if (requestCode == 403 && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
             val name = queryName(uri) ?: "Selected video"
