@@ -307,7 +307,7 @@ class VideoActivity : Activity() {
             setTextColor(muted)
             setPadding(dp(2), 0, dp(2), dp(12))
         })
-        val tools = GridLayout(this).apply { columnCount = 2 }
+        val tools = GridLayout(this).apply { columnCount = 3 }
         listOf(
             "Speed  ${playbackSpeed}×" to { choosePlaybackSpeed(video) },
             "Aspect ratio" to { cycleAspectRatio() },
@@ -315,6 +315,8 @@ class VideoActivity : Activity() {
             "Subtitles" to { chooseTrack(C.TRACK_TYPE_TEXT) },
             "Screen lock" to { controlsLocked = !controlsLocked; playerView?.useController = !controlsLocked; Toast.makeText(this, if (controlsLocked) "Player controls locked" else "Player controls unlocked", Toast.LENGTH_SHORT).show() },
             "Picture-in-picture" to { enterPlayerPip() },
+            "Previous video" to { playAdjacentVideo(-1) },
+            "Next video" to { playAdjacentVideo(1) },
             "Convert to MP3" to { convertToMp3(video) },
             "Audio extract" to { extractAudio(video) },
             "Video info" to { showInfo(video) },
@@ -326,6 +328,21 @@ class VideoActivity : Activity() {
         root.addView(tools, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
     }
 
+
+    private fun playAdjacentVideo(direction: Int) {
+        val current = currentVideo ?: return
+        val index = videos.indexOfFirst { it.id == current.id && it.uri == current.uri }
+        if (index < 0) {
+            Toast.makeText(this, "This file is not in the scanned video library", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val next = (index + direction).coerceIn(0, videos.lastIndex)
+        if (next == index) {
+            Toast.makeText(this, if (direction < 0) "First video in library" else "Last video in library", Toast.LENGTH_SHORT).show()
+            return
+        }
+        playVideo(videos[next])
+    }
 
     private fun choosePlaybackSpeed(video: LocalVideo) {
         val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
