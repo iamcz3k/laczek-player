@@ -48,6 +48,9 @@ class VideoActivity : Activity() {
     private var playbackSpeed = 1f
     private var landscape = false
     private var controlsLocked = false
+    private var playerTopPanel: View? = null
+    private var playerToolsPanel: View? = null
+    private var unlockOverlay: Button? = null
     private var aspectMode = 0
     private var gestureDownX = 0f
     private var gestureDownY = 0f
@@ -266,6 +269,7 @@ class VideoActivity : Activity() {
     }
 
     private fun playVideo(video: LocalVideo) {
+        controlsLocked = false
         currentVideo = video
         player?.release()
         val savedPosition = preferences.getLong("video_position_" + video.id, 0L).coerceAtLeast(0L)
@@ -288,6 +292,7 @@ class VideoActivity : Activity() {
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         top.addView(iconButton("Library", R.drawable.ic_arrow_back) { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
         top.addView(iconButton("Tools", R.drawable.ic_more_vert) { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
+        playerTopPanel = top
         root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         playerView = PlayerView(this).apply {
             player = this@VideoActivity.player
@@ -315,7 +320,14 @@ class VideoActivity : Activity() {
                 false
             }
         }
-        root.addView(playerView, LinearLayout.LayoutParams(-1, 0, 1f))
+        val videoFrame = FrameLayout(this)
+        videoFrame.addView(playerView, FrameLayout.LayoutParams(-1, -1))
+        unlockOverlay = button("Tap to unlock controls") { unlockPlayerControls() }.apply {
+            visibility = View.GONE
+            elevation = dp(8).toFloat()
+        }
+        videoFrame.addView(unlockOverlay, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(videoFrame, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(TextView(this).apply {
             text = video.title
             textSize = 17f
@@ -336,7 +348,7 @@ class VideoActivity : Activity() {
             "Audio tracks" to { chooseTrack(C.TRACK_TYPE_AUDIO) },
             "Subtitles" to { chooseTrack(C.TRACK_TYPE_TEXT) },
             "Load SRT subtitle" to { openSubtitleDocument() },
-            "Screen lock" to { controlsLocked = !controlsLocked; playerView?.useController = !controlsLocked; Toast.makeText(this, if (controlsLocked) "Player controls locked" else "Player controls unlocked", Toast.LENGTH_SHORT).show() },
+            "Screen lock" to { lockPlayerControls() },
             "Picture-in-picture" to { enterPlayerPip() },
             "Previous video" to { playAdjacentVideo(-1) },
             "Next video" to { playAdjacentVideo(1) },
