@@ -49,6 +49,7 @@ class VideoActivity : Activity() {
     private var controlsLocked = false
     private var aspectMode = 0
     private var gestureDownX = 0f
+    private var gestureDownY = 0f
     private var gestureStartPosition = 0L
     private var gestureStartVolume = 0
     private var gestureStartBrightness = 0.5f
@@ -281,6 +282,7 @@ class VideoActivity : Activity() {
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         gestureDownX = event.x
+                        gestureDownY = event.y
                         gestureStartPosition = this@VideoActivity.player?.currentPosition ?: 0L
                         val audio = getSystemService(AUDIO_SERVICE) as AudioManager
                         gestureStartVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -307,7 +309,12 @@ class VideoActivity : Activity() {
         })
         val tools = GridLayout(this).apply { columnCount = 2 }
         listOf(
-            "Speed  ${playbackSpeed}×" to { playbackSpeed = when (playbackSpeed) { 1f -> 1.25f; 1.25f -> 1.5f; 1.5f -> 2f; else -> 1f }; player?.playbackParameters = PlaybackParameters(playbackSpeed); buildPlaybackUi(video) },
+            "Speed  ${playbackSpeed}×" to { choosePlaybackSpeed(video) },
+            "Aspect ratio" to { cycleAspectRatio() },
+            "Audio tracks" to { chooseTrack(C.TRACK_TYPE_AUDIO) },
+            "Subtitles" to { chooseTrack(C.TRACK_TYPE_TEXT) },
+            "Screen lock" to { controlsLocked = !controlsLocked; playerView?.useController = !controlsLocked; Toast.makeText(this, if (controlsLocked) "Player controls locked" else "Player controls unlocked", Toast.LENGTH_SHORT).show() },
+            "Picture-in-picture" to { enterPlayerPip() },
             "Convert to MP3" to { convertToMp3(video) },
             "Audio extract" to { extractAudio(video) },
             "Video info" to { showInfo(video) },
