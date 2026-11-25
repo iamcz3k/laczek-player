@@ -347,7 +347,7 @@ class VideoActivity : Activity() {
     private fun choosePlaybackSpeed(video: LocalVideo) {
         val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
         val labels = speeds.map { it.toString() + "×" }.toTypedArray()
-        val selected = speeds.indexOf(playbackSpeed).coerceAtLeast(2)
+        val selected = speeds.indexOfFirst { it == playbackSpeed }.coerceAtLeast(2)
         AlertDialog.Builder(this).setTitle("Playback speed")
             .setSingleChoiceItems(labels, selected) { dialog, which ->
                 playbackSpeed = speeds[which]
