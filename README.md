@@ -19,23 +19,25 @@ An offline-first Android music player. Playback, library management, playlists, 
 - A-B repeat, sleep timer, stop after current track, fade-out timer, and ±15-second seeking.
 - Rename, share, copy, and delete supported local audio files through Android's permission/consent flows.
 - Offline listening statistics, play counts, recent history, and library CSV export.
-- Dark/light appearance, customizable accent colour, folder exclusions, and local JSON backup/restore.
+- Pixel-inspired AMOLED dark/light appearance, 24 distinct accent colours, folder exclusions, and local JSON backup/restore.
+- Native Material-style vector icons, refreshed LaCzek Player media logo, animated ripple buttons, and redesigned navigation.
+- Video playback with speed selection (0.5×–3×), brightness/volume/seek gestures, fit/zoom/stretch modes, embedded and external SRT/WebVTT subtitles, audio-track selection, screen lock, picture-in-picture, resume position, and previous/next local videos.
 - No Android INTERNET permission; the app is designed for offline use.
 
 ## Download APK
 
-**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/latest/download/LACZEKPlayer-2.4.0.apk
+**Direct APK:** https://github.com/iamcz3k/laczek-player/releases/latest/download/LACZEKPlayer-2.9.0.apk
 
-Versioned release: https://github.com/iamcz3k/laczek-player/releases/tag/v2.4.0
+Versioned release: https://github.com/iamcz3k/laczek-player/releases/tag/v2.9.0
 
-The APK is a debug build for device testing, not a production-signed release. Android may ask you to allow installation from your browser or file manager. If the release asset is not available yet, open GitHub Actions and download the `LACZEKPlayer-2.4.0-debug` artifact ZIP from the latest successful build: https://github.com/iamcz3k/laczek-player/actions
+The APK is a debug build for device testing, not a production-signed release. Android may ask you to allow installation from your browser or file manager. If the release asset is not available yet, open GitHub Actions and download the `LACZEKPlayer-2.9.0-debug` artifact ZIP from the latest successful build: https://github.com/iamcz3k/laczek-player/actions
 
 ## Build
 
 Requires JDK 17, Android SDK platform 35, and Gradle 8.9. Run `gradle assembleDebug`.
 
 - Package: `com.v3x.laczekplayer`
-- Version: `2.4.0`
+- Version: `2.9.0`
 
 ## Important limits
 

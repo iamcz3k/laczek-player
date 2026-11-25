@@ -8,18 +8,25 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.media.AudioManager
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.app.PictureInPictureParams
+import android.util.Rational
+import android.view.MotionEvent
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -40,11 +47,23 @@ class VideoActivity : Activity() {
     private var searchText = ""
     private var playbackSpeed = 1f
     private var landscape = false
-    private val purple = Color.rgb(157, 104, 255)
-    private val backgroundColor = Color.rgb(7, 6, 12)
-    private val panelColor = Color.rgb(22, 19, 32)
-    private val white = Color.rgb(250, 248, 255)
-    private val muted = Color.rgb(174, 164, 199)
+    private var controlsLocked = false
+    private var playerTopPanel: View? = null
+    private var playerToolsPanel: View? = null
+    private var unlockOverlay: Button? = null
+    private var aspectMode = 0
+    private var gestureDownX = 0f
+    private var gestureDownY = 0f
+    private var gestureStartPosition = 0L
+    private var gestureStartVolume = 0
+    private var gestureStartBrightness = 0.5f
+    private val preferences get() = getSharedPreferences("laczek_player", MODE_PRIVATE)
+    private val purple get() = preferences.getInt("accent", Color.rgb(157, 104, 255))
+    private val darkTheme get() = preferences.getBoolean("dark", true)
+    private val backgroundColor get() = if (darkTheme) Color.BLACK else Color.rgb(247, 245, 252)
+    private val panelColor get() = if (darkTheme) Color.rgb(29, 27, 35) else Color.rgb(235, 230, 240)
+    private val white get() = if (darkTheme) Color.rgb(245, 239, 247) else Color.rgb(28, 27, 31)
+    private val muted get() = if (darkTheme) Color.rgb(202, 196, 208) else Color.rgb(73, 69, 79)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,12 +96,33 @@ class VideoActivity : Activity() {
         textSize = 12f
         isAllCaps = false
         setTextColor(white)
-        background = card()
+        background = android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(Color.argb(42, Color.red(purple), Color.green(purple), Color.blue(purple))),
+            card(),
+            card(Color.WHITE)
+        )
         backgroundTintList = null
         stateListAnimator = null
-        setPadding(dp(10), dp(4), dp(10), dp(4))
-        setOnClickListener { onClick() }
+        minHeight = dp(48)
+        minimumHeight = dp(48)
+        setPadding(dp(12), dp(5), dp(12), dp(5))
+        setOnClickListener {
+            animate().cancel()
+            animate().scaleX(0.97f).scaleY(0.97f).setDuration(65L).withEndAction {
+                animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
+                onClick()
+            }.start()
+        }
     }
+
+    private fun iconButton(label: String, iconRes: Int, onClick: () -> Unit) =
+        button(label, onClick).apply {
+            val icon = getDrawable(iconRes)?.mutate()
+            icon?.setTint(white)
+            icon?.setBounds(0, 0, dp(22), dp(22))
+            setCompoundDrawables(icon, null, null, null)
+            contentDescription = label.ifBlank { "More options" }
+        }
 
     private fun buildLibraryUi() {
         root = LinearLayout(this).apply {
@@ -199,12 +239,12 @@ class VideoActivity : Activity() {
                 isClickable = true
                 setOnClickListener { playVideo(video) }
             }
-            val icon = TextView(this).apply {
-                text = "▶"
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setTextColor(purple)
+            val icon = ImageView(this).apply {
+                setImageResource(R.drawable.ic_play_arrow)
+                setColorFilter(purple)
+                scaleType = ImageView.ScaleType.CENTER
                 background = card(Color.rgb(35, 26, 54), 16)
+                contentDescription = "Play video"
             }
             row.addView(icon, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(12) })
             val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -223,17 +263,20 @@ class VideoActivity : Activity() {
                 setPadding(0, dp(5), 0, 0)
             })
             row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(button("⋮") { showVideoTools(video) }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            row.addView(iconButton("", R.drawable.ic_more_vert) { showVideoTools(video) }, LinearLayout.LayoutParams(dp(44), dp(44)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         }
     }
 
     private fun playVideo(video: LocalVideo) {
+        controlsLocked = false
         currentVideo = video
         player?.release()
+        val savedPosition = preferences.getLong("video_position_" + video.id, 0L).coerceAtLeast(0L)
         player = ExoPlayer.Builder(this).build().apply {
             setMediaItem(MediaItem.fromUri(video.uri))
             prepare()
+            if (savedPosition > 0L) seekTo(savedPosition)
             playWhenReady = true
             addListener(object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -247,18 +290,44 @@ class VideoActivity : Activity() {
     private fun buildPlaybackUi(video: LocalVideo) {
         root.removeAllViews()
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        top.addView(button("‹ Library") { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        top.addView(button("⋮ Tools") { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
+        top.addView(iconButton("Library", R.drawable.ic_arrow_back) { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+        top.addView(iconButton("Tools", R.drawable.ic_more_vert) { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
+        playerTopPanel = top
         root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         playerView = PlayerView(this).apply {
             player = this@VideoActivity.player
-            useController = true
+            useController = !controlsLocked
             controllerAutoShow = true
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             setBackgroundColor(Color.BLACK)
-            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            resizeMode = when (aspectMode) {
+                1 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                2 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        gestureDownX = event.x
+                        gestureDownY = event.y
+                        gestureStartPosition = this@VideoActivity.player?.currentPosition ?: 0L
+                        val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+                        gestureStartVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        gestureStartBrightness = window.attributes.screenBrightness.takeIf { it >= 0f } ?: 0.5f
+                    }
+                    MotionEvent.ACTION_UP -> handlePlayerGesture(event.x - gestureDownX, event.y - gestureDownY)
+                }
+                false
+            }
         }
-        root.addView(playerView, LinearLayout.LayoutParams(-1, 0, 1f))
+        val videoFrame = FrameLayout(this)
+        videoFrame.addView(playerView, FrameLayout.LayoutParams(-1, -1))
+        unlockOverlay = button("Tap to unlock controls") { unlockPlayerControls() }.apply {
+            visibility = View.GONE
+            elevation = dp(8).toFloat()
+        }
+        videoFrame.addView(unlockOverlay, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        root.addView(videoFrame, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(TextView(this).apply {
             text = video.title
             textSize = 17f
@@ -272,9 +341,17 @@ class VideoActivity : Activity() {
             setTextColor(muted)
             setPadding(dp(2), 0, dp(2), dp(12))
         })
-        val tools = GridLayout(this).apply { columnCount = 2 }
+        val tools = GridLayout(this).apply { columnCount = 3 }
         listOf(
-            "Speed  ${playbackSpeed}×" to { playbackSpeed = when (playbackSpeed) { 1f -> 1.25f; 1.25f -> 1.5f; 1.5f -> 2f; else -> 1f }; player?.playbackParameters = PlaybackParameters(playbackSpeed); buildPlaybackUi(video) },
+            "Speed  ${playbackSpeed}×" to { choosePlaybackSpeed(video) },
+            "Aspect ratio" to { cycleAspectRatio() },
+            "Audio tracks" to { chooseTrack(C.TRACK_TYPE_AUDIO) },
+            "Subtitles" to { chooseTrack(C.TRACK_TYPE_TEXT) },
+            "Load SRT subtitle" to { openSubtitleDocument() },
+            "Screen lock" to { lockPlayerControls() },
+            "Picture-in-picture" to { enterPlayerPip() },
+            "Previous video" to { playAdjacentVideo(-1) },
+            "Next video" to { playAdjacentVideo(1) },
             "Convert to MP3" to { convertToMp3(video) },
             "Audio extract" to { extractAudio(video) },
             "Video info" to { showInfo(video) },
@@ -283,7 +360,156 @@ class VideoActivity : Activity() {
             val b = button(label, action)
             tools.addView(b, GridLayout.LayoutParams().apply { width = 0; height = dp(48); columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f); setMargins(dp(4), dp(4), dp(4), dp(4)) })
         }
+        playerToolsPanel = tools
         root.addView(tools, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+    }
+
+
+    private fun lockPlayerControls() {
+        controlsLocked = true
+        playerView?.useController = false
+        playerTopPanel?.visibility = View.GONE
+        playerToolsPanel?.visibility = View.GONE
+        unlockOverlay?.visibility = View.VISIBLE
+        Toast.makeText(this, "Controls locked. Tap to unlock.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun unlockPlayerControls() {
+        controlsLocked = false
+        playerView?.useController = true
+        playerTopPanel?.visibility = View.VISIBLE
+        playerToolsPanel?.visibility = View.VISIBLE
+        unlockOverlay?.visibility = View.GONE
+        Toast.makeText(this, "Controls unlocked", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun playAdjacentVideo(direction: Int) {
+        val current = currentVideo ?: return
+        val index = videos.indexOfFirst { it.id == current.id && it.uri == current.uri }
+        if (index < 0) {
+            Toast.makeText(this, "This file is not in the scanned video library", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val next = (index + direction).coerceIn(0, videos.lastIndex)
+        if (next == index) {
+            Toast.makeText(this, if (direction < 0) "First video in library" else "Last video in library", Toast.LENGTH_SHORT).show()
+            return
+        }
+        playVideo(videos[next])
+    }
+
+    private fun choosePlaybackSpeed(video: LocalVideo) {
+        val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 2.5f, 3f)
+        val labels = speeds.map { it.toString() + "×" }.toTypedArray()
+        val selected = speeds.indexOfFirst { it == playbackSpeed }.coerceAtLeast(2)
+        AlertDialog.Builder(this).setTitle("Playback speed")
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                playbackSpeed = speeds[which]
+                player?.playbackParameters = PlaybackParameters(playbackSpeed)
+                dialog.dismiss()
+                buildPlaybackUi(video)
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun cycleAspectRatio() {
+        aspectMode = (aspectMode + 1) % 3
+        playerView?.resizeMode = when (aspectMode) {
+            1 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            2 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+            else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+        }
+        val label = arrayOf("Fit", "Zoom", "Stretch")[aspectMode]
+        Toast.makeText(this, "Aspect ratio: " + label, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun chooseTrack(trackType: Int) {
+        val currentPlayer = player ?: return
+        val groups = currentPlayer.currentTracks.groups.filter { it.type == trackType }
+        val options = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+        options.add(if (trackType == C.TRACK_TYPE_AUDIO) "Default audio" else "Subtitles off")
+        actions.add {
+            currentPlayer.trackSelectionParameters = currentPlayer.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(trackType, trackType == C.TRACK_TYPE_TEXT)
+                .clearOverridesOfType(trackType)
+                .build()
+        }
+        groups.forEach { group ->
+            for (index in 0 until group.length) {
+                if (!group.isTrackSupported(index)) continue
+                val format = group.getTrackFormat(index)
+                val label = format.label ?: format.language ?: ("Track " + (index + 1))
+                options.add(listOfNotNull(label, format.codecs, format.sampleMimeType).distinct().joinToString(" · "))
+                actions.add {
+                    currentPlayer.trackSelectionParameters = currentPlayer.trackSelectionParameters.buildUpon()
+                        .setTrackTypeDisabled(trackType, false)
+                        .clearOverridesOfType(trackType)
+                        .addOverride(TrackSelectionOverride(group.mediaTrackGroup, index))
+                        .build()
+                }
+            }
+        }
+        if (options.size == 1) {
+            Toast.makeText(this, if (trackType == C.TRACK_TYPE_AUDIO) "No selectable audio tracks found" else "No selectable subtitles found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(if (trackType == C.TRACK_TYPE_AUDIO) "Audio tracks" else "Subtitles")
+            .setItems(options.toTypedArray()) { _, which -> actions[which]() }
+            .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun enterPlayerPip() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
+            } catch (_: Exception) {
+                Toast.makeText(this, "Picture-in-picture is unavailable on this device", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Picture-in-picture requires Android 8.0 or newer", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun handlePlayerGesture(dx: Float, dy: Float) {
+        val activePlayer = player ?: return
+        val view = playerView ?: return
+        if (kotlin.math.abs(dx) > dp(48) && kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+            val delta = (dx / view.width.coerceAtLeast(1) * 120000L).toLong()
+            val end = activePlayer.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+            val target = (gestureStartPosition + delta).coerceIn(0L, end)
+            activePlayer.seekTo(target)
+            Toast.makeText(this, (if (delta >= 0) "+" else "") + (delta / 1000) + "s · " + formatTime(target), Toast.LENGTH_SHORT).show()
+        } else if (kotlin.math.abs(dy) > dp(48) && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+            if (gestureDownX < view.width / 2f) {
+                val attributes = window.attributes
+                attributes.screenBrightness = (gestureStartBrightness - dy / view.height.coerceAtLeast(1)).coerceIn(0.02f, 1f)
+                window.attributes = attributes
+                Toast.makeText(this, "Brightness " + (attributes.screenBrightness * 100).toInt() + "%", Toast.LENGTH_SHORT).show()
+            } else {
+                val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+                val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                val next = (gestureStartVolume - (dy / view.height.coerceAtLeast(1) * max).toInt()).coerceIn(0, max)
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, next, 0)
+                Toast.makeText(this, "Volume " + (next * 100 / max) + "%", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun saveVideoPosition() {
+        val video = currentVideo ?: return
+        val position = player?.currentPosition ?: return
+        preferences.edit().putLong("video_position_" + video.id, position.coerceAtLeast(0L)).apply()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (player?.isPlaying == true && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) enterPlayerPip()
+    }
+
+    override fun onPause() {
+        saveVideoPosition()
+        super.onPause()
     }
 
     private fun showVideoTools(video: LocalVideo) {
@@ -435,13 +661,47 @@ class VideoActivity : Activity() {
     @Deprecated("Use Activity Result APIs when modernizing")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 403 && resultCode == RESULT_OK) {
+        if (requestCode == 404 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
+            applyExternalSubtitle(uri)
+        } else if (requestCode == 403 && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
             val name = queryName(uri) ?: "Selected video"
             val item = LocalVideo(-1, name, uri, 0L, 0L, contentResolver.getType(uri) ?: "video/*")
             playVideo(item)
         }
+    }
+
+    private fun openSubtitleDocument() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(MimeTypes.APPLICATION_SUBRIP, MimeTypes.TEXT_VTT, "text/plain"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, 404)
+    }
+
+    private fun applyExternalSubtitle(uri: Uri) {
+        val video = currentVideo
+        if (video == null) {
+            Toast.makeText(this, "Open a video before loading subtitles", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val mime = if (contentResolver.getType(uri) == MimeTypes.TEXT_VTT) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
+        val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(mime)
+            .setLanguage("und")
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        val position = player?.currentPosition ?: 0L
+        val item = MediaItem.Builder().setUri(video.uri).setSubtitleConfigurations(listOf(subtitle)).build()
+        player?.setMediaItem(item, position)
+        player?.prepare()
+        player?.playWhenReady = true
+        Toast.makeText(this, "External subtitle loaded", Toast.LENGTH_SHORT).show()
     }
 
     private fun queryName(uri: Uri): String? = try {
@@ -476,6 +736,7 @@ class VideoActivity : Activity() {
     }
 
     override fun onDestroy() {
+        saveVideoPosition()
         playerView?.player = null
         player?.release()
         player = null
