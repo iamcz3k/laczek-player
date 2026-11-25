@@ -335,6 +335,7 @@ class VideoActivity : Activity() {
             "Aspect ratio" to { cycleAspectRatio() },
             "Audio tracks" to { chooseTrack(C.TRACK_TYPE_AUDIO) },
             "Subtitles" to { chooseTrack(C.TRACK_TYPE_TEXT) },
+            "Load SRT subtitle" to { openSubtitleDocument() },
             "Screen lock" to { controlsLocked = !controlsLocked; playerView?.useController = !controlsLocked; Toast.makeText(this, if (controlsLocked) "Player controls locked" else "Player controls unlocked", Toast.LENGTH_SHORT).show() },
             "Picture-in-picture" to { enterPlayerPip() },
             "Previous video" to { playAdjacentVideo(-1) },
