@@ -643,6 +643,36 @@ class VideoActivity : Activity() {
         }
     }
 
+    private fun openSubtitleDocument() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(MimeTypes.APPLICATION_SUBRIP, MimeTypes.TEXT_VTT, "text/plain"))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, 404)
+    }
+
+    private fun applyExternalSubtitle(uri: Uri) {
+        val video = currentVideo
+        if (video == null) {
+            Toast.makeText(this, "Open a video before loading subtitles", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val mime = if (contentResolver.getType(uri) == MimeTypes.TEXT_VTT) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
+        val subtitle = MediaItem.SubtitleConfiguration.Builder(uri)
+            .setMimeType(mime)
+            .setLanguage("und")
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+            .build()
+        val position = player?.currentPosition ?: 0L
+        val item = MediaItem.Builder().setUri(video.uri).setSubtitleConfigurations(listOf(subtitle)).build()
+        player?.setMediaItem(item, position)
+        player?.prepare()
+        player?.playWhenReady = true
+        Toast.makeText(this, "External subtitle loaded", Toast.LENGTH_SHORT).show()
+    }
+
     private fun queryName(uri: Uri): String? = try {
         contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
