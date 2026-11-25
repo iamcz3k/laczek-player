@@ -20,7 +20,7 @@ class ThemeActivity : Activity() {
         Accent("Red", Color.rgb(239,83,80)), Accent("Coral", Color.rgb(255,112,92)),
         Accent("Orange", Color.rgb(255,152,80)), Accent("Amber", Color.rgb(255,193,7)),
         Accent("Gold", Color.rgb(218,184,75)), Accent("Lime", Color.rgb(192,202,51)),
-        Accent("Green", Color.rgb(102,187,106)), Accent("Emerald", Color.rgb(38,166,154)),
+        Accent("Green", Color.rgb(102,187,106)), Accent("Emerald", Color.rgb(0,150,136)),
         Accent("Teal", Color.rgb(38,166,154)), Accent("Cyan", Color.rgb(38,198,218)),
         Accent("Sky", Color.rgb(79,195,247)), Accent("Blue", Color.rgb(66,165,245)),
         Accent("Indigo", Color.rgb(92,107,192)), Accent("Violet", Color.rgb(126,87,194)),
