@@ -8,18 +8,24 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.media.AudioManager
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.app.PictureInPictureParams
+import android.util.Rational
+import android.view.MotionEvent
 import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -40,11 +46,19 @@ class VideoActivity : Activity() {
     private var searchText = ""
     private var playbackSpeed = 1f
     private var landscape = false
-    private val purple = Color.rgb(157, 104, 255)
-    private val backgroundColor = Color.rgb(7, 6, 12)
-    private val panelColor = Color.rgb(22, 19, 32)
-    private val white = Color.rgb(250, 248, 255)
-    private val muted = Color.rgb(174, 164, 199)
+    private var controlsLocked = false
+    private var aspectMode = 0
+    private var gestureDownX = 0f
+    private var gestureStartPosition = 0L
+    private var gestureStartVolume = 0
+    private var gestureStartBrightness = 0.5f
+    private val preferences get() = getSharedPreferences("laczek_player", MODE_PRIVATE)
+    private val purple get() = preferences.getInt("accent", Color.rgb(157, 104, 255))
+    private val darkTheme get() = preferences.getBoolean("dark", true)
+    private val backgroundColor get() = if (darkTheme) Color.BLACK else Color.rgb(247, 245, 252)
+    private val panelColor get() = if (darkTheme) Color.rgb(29, 27, 35) else Color.rgb(235, 230, 240)
+    private val white get() = if (darkTheme) Color.rgb(245, 239, 247) else Color.rgb(28, 27, 31)
+    private val muted get() = if (darkTheme) Color.rgb(202, 196, 208) else Color.rgb(73, 69, 79)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -231,9 +245,11 @@ class VideoActivity : Activity() {
     private fun playVideo(video: LocalVideo) {
         currentVideo = video
         player?.release()
+        val savedPosition = preferences.getLong("video_position_" + video.id, 0L).coerceAtLeast(0L)
         player = ExoPlayer.Builder(this).build().apply {
             setMediaItem(MediaItem.fromUri(video.uri))
             prepare()
+            if (savedPosition > 0L) seekTo(savedPosition)
             playWhenReady = true
             addListener(object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -252,11 +268,28 @@ class VideoActivity : Activity() {
         root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         playerView = PlayerView(this).apply {
             player = this@VideoActivity.player
-            useController = true
+            useController = !controlsLocked
             controllerAutoShow = true
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             setBackgroundColor(Color.BLACK)
-            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            resizeMode = when (aspectMode) {
+                1 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                2 -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+            setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        gestureDownX = event.x
+                        gestureStartPosition = this@VideoActivity.player?.currentPosition ?: 0L
+                        val audio = getSystemService(AUDIO_SERVICE) as AudioManager
+                        gestureStartVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        gestureStartBrightness = window.attributes.screenBrightness.takeIf { it >= 0f } ?: 0.5f
+                    }
+                    MotionEvent.ACTION_UP -> handlePlayerGesture(event.x - gestureDownX, event.y - gestureDownY)
+                }
+                false
+            }
         }
         root.addView(playerView, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(TextView(this).apply {
