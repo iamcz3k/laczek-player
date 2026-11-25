@@ -1142,12 +1142,12 @@ class MainActivity : Activity() {
                     onSelect(index)
                 }
             }
-            val marker = TextView(this).apply {
-                text = "›"
-                textSize = 22f
-                setTextColor(orange)
-                gravity = Gravity.CENTER
+            val marker = ImageView(this).apply {
+                setImageResource(R.drawable.ic_chevron_right)
+                setColorFilter(orange)
+                scaleType = ImageView.ScaleType.CENTER
                 background = roundedBackground(panel, dp(12))
+                contentDescription = "Open menu option"
             }
             row.addView(marker, LinearLayout.LayoutParams(dp(38), dp(38)).apply { marginEnd = dp(12) })
             val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL }
