@@ -360,9 +360,28 @@ class VideoActivity : Activity() {
             val b = button(label, action)
             tools.addView(b, GridLayout.LayoutParams().apply { width = 0; height = dp(48); columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f); setMargins(dp(4), dp(4), dp(4), dp(4)) })
         }
+        playerToolsPanel = tools
         root.addView(tools, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
     }
 
+
+    private fun lockPlayerControls() {
+        controlsLocked = true
+        playerView?.useController = false
+        playerTopPanel?.visibility = View.GONE
+        playerToolsPanel?.visibility = View.GONE
+        unlockOverlay?.visibility = View.VISIBLE
+        Toast.makeText(this, "Controls locked. Tap to unlock.", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun unlockPlayerControls() {
+        controlsLocked = false
+        playerView?.useController = true
+        playerTopPanel?.visibility = View.VISIBLE
+        playerToolsPanel?.visibility = View.VISIBLE
+        unlockOverlay?.visibility = View.GONE
+        Toast.makeText(this, "Controls unlocked", Toast.LENGTH_SHORT).show()
+    }
 
     private fun playAdjacentVideo(direction: Int) {
         val current = currentVideo ?: return
