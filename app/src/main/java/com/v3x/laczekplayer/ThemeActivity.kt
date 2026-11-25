@@ -116,7 +116,7 @@ class ThemeActivity : Activity() {
                 }
             }
             val swatch = View(this).apply {
-                background = shape(item.color, 22, if (selected) foreground else Color.TRANSPARENT)
+                background = shape(item.color, 22, if (selected) foreground.toInt() else Color.TRANSPARENT)
                 contentDescription = item.name
             }
             tile.addView(swatch, LinearLayout.LayoutParams(dp(48), dp(48)))
