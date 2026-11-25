@@ -34,7 +34,7 @@ class ThemeActivity : Activity() {
     private var dark = true
     private val bg get() = if (dark) Color.BLACK else Color.rgb(247,245,252)
     private val surface get() = if (dark) Color.rgb(29,27,35) else Color.WHITE
-    private val foreground get() = if (dark) Color.rgb(245,239,247) else Color.rgb(28,27,31)
+    private val fgColor get() = if (dark) Color.rgb(245,239,247) else Color.rgb(28,27,31)
     private val secondary get() = if (dark) Color.rgb(202,196,208) else Color.rgb(73,69,79)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,9 +66,9 @@ class ThemeActivity : Activity() {
             setPadding(dp(20), dp(16), dp(20), dp(28))
         }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        header.addView(button("‹", surface, foreground) { finish() }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        header.addView(button("‹", surface, fgColor) { finish() }, LinearLayout.LayoutParams(dp(48), dp(48)))
         val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), 0, 0, 0) }
-        heading.addView(label("Appearance", 23f, foreground, true))
+        heading.addView(label("Appearance", 23f, fgColor, true))
         heading.addView(label("Material 3 expressive", 12f, secondary))
         header.addView(heading)
         page.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(24) })
@@ -79,14 +79,14 @@ class ThemeActivity : Activity() {
             background = shape(surface, 28)
             setPadding(dp(16), dp(14), dp(16), dp(14))
         }
-        modeCard.addView(label("Theme mode", 16f, foreground, true))
+        modeCard.addView(label("Theme mode", 16f, fgColor, true))
         modeCard.addView(label("Choose the surface style used throughout the player", 12f, secondary).apply {
             setPadding(0, dp(4), 0, dp(12))
         })
         val modes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         listOf("Dark" to true, "Light" to false).forEach { (name, value) ->
             val selected = dark == value
-            modes.addView(button(name, if (selected) accent else bg, if (selected) Color.BLACK else foreground) {
+            modes.addView(button(name, if (selected) accent else bg, if (selected) Color.BLACK else fgColor) {
                 dark = value
                 prefs.edit().putBoolean("dark", dark).apply()
                 render()
@@ -96,7 +96,7 @@ class ThemeActivity : Activity() {
         page.addView(modeCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(24) })
 
         page.addView(label("ACCENT COLOUR", 11f, secondary, true).apply { letterSpacing = .12f })
-        page.addView(label("24 curated colours", 22f, foreground, true).apply { setPadding(0, dp(5), 0, dp(3)) })
+        page.addView(label("24 curated colours", 22f, fgColor, true).apply { setPadding(0, dp(5), 0, dp(3)) })
         page.addView(label("Choose an accent for buttons, sliders, highlights and player controls.", 13f, secondary)
             .apply { setPadding(0, 0, 0, dp(14)) })
 
@@ -117,12 +117,12 @@ class ThemeActivity : Activity() {
             }
             val swatch = View(this).apply {
                 val swatchShape = shape(item.color, 22)
-                if (selected) swatchShape.setStroke(dp(2), foreground)
+                if (selected) swatchShape.setStroke(dp(2), fgColor)
                 background = swatchShape
                 contentDescription = item.name
             }
             tile.addView(swatch, LinearLayout.LayoutParams(dp(48), dp(48)))
-            tile.addView(label(item.name, 11f, foreground).apply { gravity = Gravity.CENTER; setPadding(0, dp(5), 0, 0) })
+            tile.addView(label(item.name, 11f, fgColor).apply { gravity = Gravity.CENTER; setPadding(0, dp(5), 0, 0) })
             val params = GridLayout.LayoutParams().apply {
                 width = 0
                 height = dp(88)
@@ -137,7 +137,7 @@ class ThemeActivity : Activity() {
             background = shape(surface, 28)
             setPadding(dp(16), dp(16), dp(16), dp(16))
         }
-        preview.addView(label("Live preview", 15f, foreground, true))
+        preview.addView(label("Live preview", 15f, fgColor, true))
         preview.addView(label("LaCzek Player · Your music, your colours", 12f, secondary).apply {
             setPadding(0, dp(5), 0, dp(12))
         })
