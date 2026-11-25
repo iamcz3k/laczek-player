@@ -719,7 +719,7 @@ class MainActivity : Activity() {
         setColor(color)
         cornerRadius = radius.toFloat()
         if (dark && color != Color.TRANSPARENT && color != bg) {
-            setStroke(dp(1), if (color == orange) Color.argb(170, 255, 255, 255) else Color.argb(42, accentColor))
+            setStroke(dp(1), if (color == orange) Color.argb(170, 255, 255, 255) else Color.argb(42, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor)))
         }
     }
 
