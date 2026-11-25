@@ -696,7 +696,7 @@ class MainActivity : Activity() {
         letterSpacing = .015f
         setTextColor(fg)
         background = android.graphics.drawable.RippleDrawable(
-            android.content.res.ColorStateList.valueOf(Color.argb(42, accentColor)),
+            android.content.res.ColorStateList.valueOf(Color.argb(42, Color.red(accentColor), Color.green(accentColor), Color.blue(accentColor))),
             roundedBackground(panel, dp(19)),
             roundedBackground(Color.WHITE, dp(19))
         )
