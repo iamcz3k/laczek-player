@@ -25,6 +25,7 @@ import android.view.View
 import android.widget.*
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -92,12 +93,33 @@ class VideoActivity : Activity() {
         textSize = 12f
         isAllCaps = false
         setTextColor(white)
-        background = card()
+        background = android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(Color.argb(42, Color.red(purple), Color.green(purple), Color.blue(purple))),
+            card(),
+            card(Color.WHITE)
+        )
         backgroundTintList = null
         stateListAnimator = null
-        setPadding(dp(10), dp(4), dp(10), dp(4))
-        setOnClickListener { onClick() }
+        minHeight = dp(48)
+        minimumHeight = dp(48)
+        setPadding(dp(12), dp(5), dp(12), dp(5))
+        setOnClickListener {
+            animate().cancel()
+            animate().scaleX(0.97f).scaleY(0.97f).setDuration(65L).withEndAction {
+                animate().scaleX(1f).scaleY(1f).setDuration(110L).start()
+                onClick()
+            }.start()
+        }
     }
+
+    private fun iconButton(label: String, iconRes: Int, onClick: () -> Unit) =
+        button(label, onClick).apply {
+            val icon = getDrawable(iconRes)?.mutate()
+            icon?.setTint(white)
+            icon?.setBounds(0, 0, dp(22), dp(22))
+            setCompoundDrawables(icon, null, null, null)
+            contentDescription = label.ifBlank { "More options" }
+        }
 
     private fun buildLibraryUi() {
         root = LinearLayout(this).apply {
@@ -214,12 +236,12 @@ class VideoActivity : Activity() {
                 isClickable = true
                 setOnClickListener { playVideo(video) }
             }
-            val icon = TextView(this).apply {
-                text = "▶"
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setTextColor(purple)
+            val icon = ImageView(this).apply {
+                setImageResource(R.drawable.ic_play_arrow)
+                setColorFilter(purple)
+                scaleType = ImageView.ScaleType.CENTER
                 background = card(Color.rgb(35, 26, 54), 16)
+                contentDescription = "Play video"
             }
             row.addView(icon, LinearLayout.LayoutParams(dp(54), dp(54)).apply { marginEnd = dp(12) })
             val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -238,7 +260,7 @@ class VideoActivity : Activity() {
                 setPadding(0, dp(5), 0, 0)
             })
             row.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(button("⋮") { showVideoTools(video) }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            row.addView(iconButton("", R.drawable.ic_more_vert) { showVideoTools(video) }, LinearLayout.LayoutParams(dp(44), dp(44)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
         }
     }
@@ -264,8 +286,8 @@ class VideoActivity : Activity() {
     private fun buildPlaybackUi(video: LocalVideo) {
         root.removeAllViews()
         val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        top.addView(button("‹ Library") { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        top.addView(button("⋮ Tools") { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
+        top.addView(iconButton("Library", R.drawable.ic_arrow_back) { player?.pause(); playerView?.player = null; playerView = null; buildLibraryUi(); renderVideos() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+        top.addView(iconButton("Tools", R.drawable.ic_more_vert) { showVideoTools(video) }, LinearLayout.LayoutParams(dp(100), dp(48)))
         root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         playerView = PlayerView(this).apply {
             player = this@VideoActivity.player
